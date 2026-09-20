@@ -1,2 +1,3 @@
-LEADER: Đinh Thị Mai Trâm
-La Thi Tra My
+LEADER: Đinh Thị Mai Trâm <br>
+Đoàn Bùi Khánh Vy
+La Thị Trà My
