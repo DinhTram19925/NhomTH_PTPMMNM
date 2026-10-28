@@ -1,9 +1,9 @@
+SET NAMES utf8mb4;
+DROP DATABASE IF EXISTS royaldine_5s;
 CREATE DATABASE IF NOT EXISTS royaldine_5s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE royaldine_5s;
 
--- =========================================================================
--- PHÂN HỆ 1 (MAI TRÂM): QUẢN TRỊ HỆ THỐNG, NHÂN SỰ, THỰC ĐƠN & ĐỊNH LƯỢNG BOM
--- =========================================================================
+-- MAI TRÂM: QUẢN TRỊ HỆ THỐNG, NHÂN SỰ, THỰC ĐƠN & ĐỊNH LƯỢNG BOM
 
 CREATE TABLE roles (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -86,9 +86,7 @@ CREATE TABLE recipes_bom (
     FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
--- =========================================================================
--- PHÂN HỆ 2 (KHÁNH VY): SƠ ĐỒ BÀN, ĐẶT BÀN VIP (BOOKING) & CRM
--- =========================================================================
+-- KHÁNH VY: SƠ ĐỒ BÀN, ĐẶT BÀN VIP (BOOKING) & CRM
 
 CREATE TABLE areas (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -147,9 +145,7 @@ CREATE TABLE reservations (
     FOREIGN KEY (table_id) REFERENCES dining_tables(id)
 ) ENGINE=InnoDB;
 
--- =========================================================================
--- PHÂN HỆ 3 (TRÀ MY): BÁN HÀNG (POS/QR), ĐIỀU PHỐI BẾP (KDS) & THANH TOÁN
--- =========================================================================
+-- TRÀ MY: BÁN HÀNG (POS/QR), ĐIỀU PHỐI BẾP (KDS) & THANH TOÁN
 
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -213,9 +209,7 @@ CREATE TABLE order_logs (
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
--- =========================================================================
--- PHÂN HỆ 4 (KIM HIỀN - Tiếp): NHẬP XUẤT KHO & BÀN GIAO CA THU NGÂN
--- =========================================================================
+-- KIM HIỀN : NHẬP XUẤT KHO & BÀN GIAO CA THU NGÂN
 
 CREATE TABLE stock_receipts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -257,9 +251,7 @@ CREATE TABLE cash_shifts (
     FOREIGN KEY (cashier_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
--- =========================================================================
--- DỮ LIỆU MẪU (SEED DATA)
--- =========================================================================
+-- SEED DATA
 
 INSERT INTO roles (role_code, role_name) VALUES
 ('ADMIN', 'Quản lý nhà hàng (Leader)'),
@@ -270,11 +262,11 @@ INSERT INTO roles (role_code, role_name) VALUES
 
 -- Mật khẩu mặc định của mọi tài khoản là: 123456
 INSERT INTO users (role_id, full_name, username, password_hash, phone) VALUES
-(1, 'Đinh Thị Mai Trâm', 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0901000001'),
-(2, 'Đoàn Bùi Khánh Vy', 'hostess', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0901000002'),
-(3, 'La Thị Trà My', 'cashier', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0901000003'),
-(4, 'Bếp trưởng RoyalDine', 'chef', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0901000004'),
-(5, 'Quảng Thị Kim Hiền', 'stock', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0901000005');
+(1, 'Đinh Thị Mai Trâm', 'admin', '$2y$10$HKjEDZJJxJ.U.XKOzNoK8e7Md/b7Ts08b/VkUTrh6CU3/Uay56zhq', '0901000001'),
+(2, 'Đoàn Bùi Khánh Vy', 'hostess', '$2y$10$HKjEDZJJxJ.U.XKOzNoK8e7Md/b7Ts08b/VkUTrh6CU3/Uay56zhq', '0901000002'),
+(3, 'La Thị Trà My', 'cashier', '$2y$10$HKjEDZJJxJ.U.XKOzNoK8e7Md/b7Ts08b/VkUTrh6CU3/Uay56zhq', '0901000003'),
+(4, 'Bếp trưởng RoyalDine', 'chef', '$2y$10$HKjEDZJJxJ.U.XKOzNoK8e7Md/b7Ts08b/VkUTrh6CU3/Uay56zhq', '0901000004'),
+(5, 'Quảng Thị Kim Hiền', 'stock', '$2y$10$HKjEDZJJxJ.U.XKOzNoK8e7Md/b7Ts08b/VkUTrh6CU3/Uay56zhq', '0901000005');
 
 INSERT INTO categories (name, course_type, display_order) VALUES
 ('Khai vị Tinh hoa (Appetizers)', 'Appetizer', 1),
