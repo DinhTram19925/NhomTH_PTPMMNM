@@ -9,41 +9,242 @@ class MenuController extends Controller {
             INSERT INTO audit_logs (user_id, action_type, module_name, description, severity, ip_address)
             VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$_SESSION['user']['id'], $actionType, $moduleName, $description, $severity,$ip]);
+        $stmt->execute([$_SESSION['user']['id'], $actionType, $moduleName, $description, $severity, $ip]);
     }
 
     public function dashboard() {
         $this->requireRole();
-        $totalItems =$this->db->query("SELECT COUNT(*) FROM menu_items")->fetchColumn();
-        $totalTables =$this->db->query("SELECT COUNT(*) FROM dining_tables")->fetchColumn();
-        $totalUsers =$this->db->query("SELECT COUNT(*) FROM users")->fetchColumn();
+        $totalItems = $this->db->query("SELECT COUNT(*) FROM menu_items")->fetchColumn();
+        $totalTables = $this->db->query("SELECT COUNT(*) FROM dining_tables")->fetchColumn();
+        $totalUsers = $this->db->query("SELECT COUNT(*) FROM users")->fetchColumn();
         $this->render('menu/dashboard', compact('totalItems', 'totalTables', 'totalUsers'));
     }
 
+    // ==================== QUẢN LÝ THỰC ĐƠN 5 SAO, ĐỊNH LƯỢNG (BOM) & SỞ THÍCH (MODIFIERS) ====================
     public function index() {
         $this->requireRole(['ADMIN', 'CHEF']);
+
+        $catFilter = isset($_GET['cat_id']) ? (int)$_GET['cat_id'] : 0;
+        $whereSql = $catFilter > 0 ? "WHERE m.category_id = $catFilter" : "";
+
+        // 1. Lấy danh sách món ăn kèm chuỗi tóm tắt BOM và Modifiers
+        $items = $this->db->query("
+            SELECT m.*, c.name AS category_name,
+            (SELECT COUNT(*) FROM recipes_bom b WHERE b.menu_item_id = m.id) AS bom_count,
+            (SELECT GROUP_CONCAT(CONCAT(i.name, ' (', b.quantity_required, ' ', i.unit, ')') SEPARATOR ' • ')
+             FROM recipes_bom b JOIN ingredients i ON b.ingredient_id = i.id WHERE b.menu_item_id = m.id) AS bom_list,
+            (SELECT GROUP_CONCAT(CONCAT('[', im.modifier_group, '] ', im.modifier_name, IF(im.extra_price > 0, CONCAT(' (+', FORMAT(im.extra_price, 0), 'đ)'), '')) SEPARATOR ' • ')
+             FROM item_modifiers im WHERE im.menu_item_id = m.id) AS modifier_list
+            FROM menu_items m 
+            JOIN categories c ON m.category_id = c.id 
+            $whereSql
+            ORDER BY m.id DESC
+        ")->fetchAll();
+
+        // 2. Lấy danh mục nhóm thực đơn
+        $categories = $this->db->query("SELECT * FROM categories ORDER BY id ASC")->fetchAll();
+
+        // 3. Lấy danh sách Nguyên vật liệu trong kho (để chọn vào công thức BOM)
+        $ingredients = $this->db->query("SELECT * FROM ingredients ORDER BY name ASC")->fetchAll();
+
+        // 4. Lấy chi tiết BOM của từng món (nhóm theo menu_item_id để hiển thị trong Modal)
+        $bomRaw = $this->db->query("
+            SELECT b.menu_item_id, b.ingredient_id, b.quantity_required, i.name AS ingredient_name, i.unit
+            FROM recipes_bom b
+            JOIN ingredients i ON b.ingredient_id = i.id
+            ORDER BY i.name ASC
+        ")->fetchAll();
+        $bomByItem = [];
+        foreach ($bomRaw as $row) {
+            $bomByItem[$row['menu_item_id']][] = $row;
+        }
+
+        // 5. Lấy chi tiết Sở thích phục vụ (Modifiers) của từng món
+        $modRaw = $this->db->query("SELECT * FROM item_modifiers ORDER BY modifier_group ASC, id ASC")->fetchAll();
+        $modByItem = [];
+        foreach ($modRaw as $row) {
+            $modByItem[$row['menu_item_id']][] = $row;
+        }
+
+        $this->render('menu/index', compact('items', 'categories', 'ingredients', 'bomByItem', 'modByItem', 'catFilter'));
+    }
+
+    // Thêm Danh mục nhóm thực đơn mới
+    public function saveCategory() {
+        $this->requireRole(['ADMIN', 'CHEF']);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['category_name'])) {
+            $catName = trim($_POST['category_name']);
+            $stmt = $this->db->prepare("INSERT INTO categories (name) VALUES (?)");
+            $stmt->execute([$catName]);
+            $this->logAction('CREATE_CATEGORY', 'Thực đơn & BOM', "Thêm nhóm thực đơn mới: $catName", 'INFO');
+            $_SESSION['flash_msg'] = "Đã thêm nhóm thực đơn '$catName' thành công!";
+        }
+        header("Location: index.php?c=menu&a=index");
+        exit;
+    }
+
+    // Thêm mới hoặc Cập nhật Món ăn / Set Menu 5 Sao
+    public function saveMenuItem() {
+        $this->requireRole(['ADMIN', 'CHEF']);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $stmt =$this->db->prepare("INSERT INTO menu_items (category_id, item_code, name, unit, price, status) VALUES (?, ?, ?, ?, ?, 'Available')");
-            $stmt->execute([$_POST['category_id'], $_POST['item_code'],$_POST['name'], $_POST['unit'],$_POST['price']]);
-            $this->logAction('CREATE_MENU', 'Thực đơn & BOM', "Thêm món mới: {$_POST['name']} ({$_POST['item_code']}) - Giá: " . number_format($_POST['price']) . "đ", 'INFO');
-            header("Location: index.php?c=menu&a=index");
+            $id = !empty($_POST['item_id']) ? (int)$_POST['item_id'] : 0;
+            $categoryId = (int)$_POST['category_id'];
+            $itemCode = trim($_POST['item_code']);
+            $name = trim($_POST['name']);
+            $unit = trim($_POST['unit']);
+            $price = (float)$_POST['price'];
+            $status = $_POST['status'] ?? 'Available';
+
+            if ($id > 0) {
+                $stmt = $this->db->prepare("
+                    UPDATE menu_items 
+                    SET category_id = ?, item_code = ?, name = ?, unit = ?, price = ?, status = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([$categoryId, $itemCode, $name, $unit, $price, $status, $id]);
+                $this->logAction('UPDATE_MENU', 'Thực đơn & BOM', "Cập nhật món '$name' ($itemCode) - Giá mới: " . number_format($price) . "đ", 'WARNING');
+                $_SESSION['flash_msg'] = "Đã cập nhật món '$name' thành công!";
+            } else {
+                try {
+                    $stmt = $this->db->prepare("
+                        INSERT INTO menu_items (category_id, item_code, name, unit, price, status) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([$categoryId, $itemCode, $name, $unit, $price, $status]);
+                    $this->logAction('CREATE_MENU', 'Thực đơn & BOM', "Thêm món mới '$name' ($itemCode) - Giá: " . number_format($price) . "đ", 'INFO');
+                    $_SESSION['flash_msg'] = "Đã thêm món '$name' vào thực đơn!";
+                } catch (PDOException $e) {
+                    $_SESSION['flash_err'] = "Lỗi: Mã món '$itemCode' đã tồn tại!";
+                }
+            }
+        }
+        header("Location: index.php?c=menu&a=index");
+        exit;
+    }
+
+    // Đổi nhanh trạng thái Đang kinh doanh (Available) <-> Tạm hết (Unavailable)
+    public function toggleMenuStatus() {
+        $this->requireRole(['ADMIN', 'CHEF']);
+        $id = (int)($_GET['id'] ?? 0);
+        $stmt = $this->db->prepare("SELECT name, item_code, status FROM menu_items WHERE id = ?");
+        $stmt->execute([$id]);
+        $item = $stmt->fetch();
+        if ($item) {
+            $newStatus = ($item['status'] === 'Available') ? 'Unavailable' : 'Available';
+            $this->db->prepare("UPDATE menu_items SET status = ? WHERE id = ?")->execute([$newStatus, $id]);
+            $label = ($newStatus === 'Available') ? 'MỞ BÁN LẠI' : 'BÁO TẠM HẾT MÓN';
+            $sev = ($newStatus === 'Available') ? 'INFO' : 'WARNING';
+            $this->logAction('TOGGLE_MENU_STATUS', 'Thực đơn & BOM', "$label đối với món '{$item['name']}' ({$item['item_code']})", $sev);
+            $_SESSION['flash_msg'] = "Đã cập nhật trạng thái '$label' cho món {$item['name']}!";
+        }
+        header("Location: index.php?c=menu&a=index");
+        exit;
+    }
+
+    // Xóa món ăn khỏi Thực đơn
+    public function deleteMenuItem() {
+        $this->requireRole(['ADMIN']);
+        $id = (int)($_GET['id'] ?? 0);
+        $stmt = $this->db->prepare("SELECT name, item_code FROM menu_items WHERE id = ?");
+        $stmt->execute([$id]);
+        $item = $stmt->fetch();
+        if ($item) {
+            try {
+                $this->db->prepare("DELETE FROM recipes_bom WHERE menu_item_id = ?")->execute([$id]);
+                $this->db->prepare("DELETE FROM item_modifiers WHERE menu_item_id = ?")->execute([$id]);
+                $this->db->prepare("DELETE FROM menu_items WHERE id = ?")->execute([$id]);
+                $this->logAction('DELETE_MENU', 'Thực đơn & BOM', "Xóa món ăn '{$item['name']}' ({$item['item_code']}) khỏi thực đơn", 'CRITICAL');
+                $_SESSION['flash_msg'] = "Đã xóa món '{$item['name']}' thành công!";
+            } catch (PDOException $e) {
+                $_SESSION['flash_err'] = "Không thể xóa món này vì đã phát sinh trong hóa đơn bán hàng! Hãy chuyển sang trạng thái 'Tạm hết'.";
+            }
+        }
+        header("Location: index.php?c=menu&a=index");
+        exit;
+    }
+
+    // Thêm / Cập nhật nguyên liệu vào Công thức Định lượng (BOM)
+    public function addBom() {
+        $this->requireRole(['ADMIN', 'CHEF']);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $menuItemId = (int)$_POST['menu_item_id'];
+            $ingredientId = (int)$_POST['ingredient_id'];
+            $qty = (float)$_POST['quantity_required'];
+
+            if ($menuItemId > 0 && $ingredientId > 0 && $qty > 0) {
+                // Kiểm tra xem nguyên liệu đã có trong BOM của món này chưa
+                $check = $this->db->prepare("SELECT COUNT(*) FROM recipes_bom WHERE menu_item_id = ? AND ingredient_id = ?");
+                $check->execute([$menuItemId, $ingredientId]);
+                if ($check->fetchColumn() > 0) {
+                    $stmt = $this->db->prepare("UPDATE recipes_bom SET quantity_required = ? WHERE menu_item_id = ? AND ingredient_id = ?");
+                    $stmt->execute([$qty, $menuItemId, $ingredientId]);
+                } else {
+                    $stmt = $this->db->prepare("INSERT INTO recipes_bom (menu_item_id, ingredient_id, quantity_required) VALUES (?, ?, ?)");
+                    $stmt->execute([$menuItemId, $ingredientId, $qty]);
+                }
+                $this->logAction('UPDATE_BOM', 'Định lượng BOM', "Cập nhật định lượng nguyên liệu ID #$ingredientId (SL: $qty) cho món ID #$menuItemId", 'INFO');
+                $_SESSION['flash_msg'] = "Đã cập nhật công thức định lượng (BOM) thành công!";
+            }
+            header("Location: index.php?c=menu&a=index&open_bom=$menuItemId");
             exit;
         }
-        $items =$this->db->query("
-            SELECT m.*, c.name AS category_name,
-            (SELECT GROUP_CONCAT(CONCAT(i.name, ' (', b.quantity_required, i.unit, ')') SEPARATOR ', ')
-             FROM recipes_bom b JOIN ingredients i ON b.ingredient_id = i.id WHERE b.menu_item_id = m.id) AS bom_list
-            FROM menu_items m JOIN categories c ON m.category_id = c.id ORDER BY m.id DESC
-        ")->fetchAll();
-        $categories =$this->db->query("SELECT * FROM categories")->fetchAll();
-        $this->render('menu/index', compact('items', 'categories'));
+    }
+
+    // Xóa 1 nguyên liệu khỏi Công thức Định lượng (BOM)
+    public function deleteBom() {
+        $this->requireRole(['ADMIN', 'CHEF']);
+        $menuItemId = (int)($_GET['menu_item_id'] ?? 0);
+        $ingredientId = (int)($_GET['ingredient_id'] ?? 0);
+        if ($menuItemId > 0 && $ingredientId > 0) {
+            $this->db->prepare("DELETE FROM recipes_bom WHERE menu_item_id = ? AND ingredient_id = ?")
+                     ->execute([$menuItemId, $ingredientId]);
+            $this->logAction('DELETE_BOM', 'Định lượng BOM', "Xóa nguyên liệu ID #$ingredientId khỏi công thức món ID #$menuItemId", 'WARNING');
+            $_SESSION['flash_msg'] = "Đã xóa nguyên liệu khỏi công thức định lượng!";
+        }
+        header("Location: index.php?c=menu&a=index&open_bom=$menuItemId");
+        exit;
+    }
+
+    // Thêm Sở thích phục vụ (Modifier) cho món ăn
+    public function addModifier() {
+        $this->requireRole(['ADMIN', 'CHEF']);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $menuItemId = (int)$_POST['menu_item_id'];
+            $group = trim($_POST['modifier_group']);
+            $name = trim($_POST['modifier_name']);
+            $extraPrice = (float)($_POST['extra_price'] ?? 0);
+
+            if ($menuItemId > 0 && $name !== '') {
+                $stmt = $this->db->prepare("
+                    INSERT INTO item_modifiers (menu_item_id, modifier_group, modifier_name, extra_price)
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([$menuItemId, $group, $name, $extraPrice]);
+                $this->logAction('ADD_MODIFIER', 'Sở thích phục vụ', "Thêm tùy chọn '$name' ($group) cho món ID #$menuItemId", 'INFO');
+                $_SESSION['flash_msg'] = "Đã thêm sở thích phục vụ '$name' thành công!";
+            }
+            header("Location: index.php?c=menu&a=index&open_mod=$menuItemId");
+            exit;
+        }
+    }
+
+    // Xóa Sở thích phục vụ (Modifier)
+    public function deleteModifier() {
+        $this->requireRole(['ADMIN', 'CHEF']);
+        $id = (int)($_GET['id'] ?? 0);
+        $menuItemId = (int)($_GET['menu_item_id'] ?? 0);
+        if ($id > 0) {
+            $this->db->prepare("DELETE FROM item_modifiers WHERE id = ?")->execute([$id]);$this->logAction('DELETE_MODIFIER', 'Sở thích phục vụ', "Xóa sở thích phục vụ ID #$id của món ID #$menuItemId", 'WARNING');
+            $_SESSION['flash_msg'] = "Đã xóa tùy chọn phục vụ!";
+        }
+        header("Location: index.php?c=menu&a=index&open_mod=$menuItemId");
+        exit;
     }
 
     // ==================== PHÂN HỆ I: NHÂN VIÊN, CA LÀM VIỆC & PHÂN QUYỀN ====================
     public function users() {
         $this->requireRole(['ADMIN']);
 
-        // 1. Danh sách nhân viên + Vai trò
         $users =$this->db->query("
             SELECT u.*, r.role_code, r.role_name 
             FROM users u 
@@ -51,13 +252,9 @@ class MenuController extends Controller {
             ORDER BY u.id ASC
         ")->fetchAll();
 
-        // 2. Danh sách Vai trò (RBAC)
         $roles =$this->db->query("SELECT * FROM roles ORDER BY id ASC")->fetchAll();
-
-        // 3. Danh mục Ca làm việc
         $shifts =$this->db->query("SELECT * FROM work_shifts ORDER BY start_time ASC")->fetchAll();
 
-        // 4. Bảng phân ca & chấm công (Lọc theo ngày, mặc định hôm nay)
         $filterDate =$_GET['date'] ?? date('Y-m-d');
         $stmtSched =$this->db->prepare("
             SELECT s.*, u.full_name, u.username, r.role_code, w.shift_name, w.start_time, w.end_time, w.allowance
@@ -71,7 +268,6 @@ class MenuController extends Controller {
         $stmtSched->execute([$filterDate]);
         $schedules =$stmtSched->fetchAll();
 
-        // 5. Nhật ký thao tác & Kiểm soát sai lệch (Lấy 30 log mới nhất)
         $severityFilter =$_GET['severity'] ?? '';
         if ($severityFilter && in_array($severityFilter, ['INFO', 'WARNING', 'CRITICAL'])) {
             $stmtLog =$this->db->prepare("
@@ -97,7 +293,6 @@ class MenuController extends Controller {
         $this->render('menu/users', compact('users', 'roles', 'shifts', 'schedules', 'auditLogs', 'filterDate', 'severityFilter'));
     }
 
-    // Thêm mới hoặc Cập nhật Hồ sơ nhân viên
     public function saveUser() {
         $this->requireRole(['ADMIN']);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {$id = !empty($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
@@ -107,12 +302,10 @@ class MenuController extends Controller {
             $roleId = (int)$_POST['role_id'];
 
             if ($id > 0) {
-                // Cập nhật hồ sơ & vai trò
                 $stmt =$this->db->prepare("UPDATE users SET full_name = ?, phone = ?, role_id = ? WHERE id = ?");
                 $stmt->execute([$fullName, $phone,$roleId, $id]);$this->logAction('UPDATE_USER', 'Hồ sơ nhân viên', "Cập nhật thông tin/vai trò cho nhân viên: $fullName (ID: #$id)", 'WARNING');
                 $_SESSION['flash_msg'] = "Đã cập nhật hồ sơ nhân viên $fullName thành công!";
             } else {
-                // Thêm nhân viên mới
                 $password = !empty($_POST['password']) ?$_POST['password'] : '123456';
                 $hash = password_hash($password, PASSWORD_BCRYPT);
                 try {
@@ -131,7 +324,6 @@ class MenuController extends Controller {
         exit;
     }
 
-    // Khóa / Mở khóa tài khoản nhân viên (Kiểm soát truy cập)
     public function toggleUserStatus() {
         $this->requireRole(['ADMIN']);
         $id = (int)($_GET['id'] ?? 0);
@@ -154,7 +346,6 @@ class MenuController extends Controller {
         exit;
     }
 
-    // Cấp lại mật khẩu mặc định (123456)
     public function resetPassword() {
         $this->requireRole(['ADMIN']);
         $id = (int)($_GET['id'] ?? 0);
@@ -169,7 +360,6 @@ class MenuController extends Controller {
         exit;
     }
 
-    // Thêm Ca làm việc mới hoặc Phân ca cho nhân viên
     public function assignShift() {
         $this->requireRole(['ADMIN']);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -193,7 +383,6 @@ class MenuController extends Controller {
         }
     }
 
-    // Chấm công Vào ca (Check-in) / Tan ca (Check-out) / Báo vắng
     public function attendance() {
         $this->requireRole(['ADMIN']);
         $id = (int)($_GET['id'] ?? 0);
@@ -212,7 +401,6 @@ class MenuController extends Controller {
 
         if ($sched) {$now = date('H:i:s');
             if ($type === 'in') {
-                // So sánh giờ chấm công thực tế với giờ bắt đầu ca (cho phép trễ tối đa 5 phút)
                 $status = (strtotime($now) > strtotime($sched['start_time']) + 300) ? 'Late' : 'OnTime';$this->db->prepare("UPDATE staff_schedules SET check_in = ?, attendance_status = ? WHERE id = ?")
                          ->execute([$now, $status,$id]);
                 $statusLabel = ($status === 'Late') ? 'ĐI TRỄ' : 'ĐÚNG GIỜ';
