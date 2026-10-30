@@ -120,7 +120,7 @@
             </div>
         </div>
         <button onclick="history.back()" class="btn btn-return-lux px-4 py-2 shadow-sm rounded-3">
-            🔙 Quay lại trang trước
+             Quay lại 
         </button>
     </div>
 

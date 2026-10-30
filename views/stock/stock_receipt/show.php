@@ -103,7 +103,14 @@
                 </div>
                 <div class="d-flex justify-content-between mt-1">
                     <span class="text-muted">Loại phiếu:</span>
-                    <span class="badge bg-success">Nhập hàng</span>
+                    <?php 
+                    $rtype = strtolower($receipt['receipt_type'] ?? '');
+                    if (strpos($rtype, 'nhập') !== false || $rtype == 'import'): 
+                ?>
+                    <span class="badge bg-success px-3 py-2">Nhập kho</span>
+                <?php else: ?>
+                    <span class="badge bg-danger px-3 py-2">Xuất kho</span>
+                <?php endif; ?>
                 </div>
             </div>
         </div>
