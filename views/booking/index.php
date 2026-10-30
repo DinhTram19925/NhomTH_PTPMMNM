@@ -25,8 +25,23 @@ $statusInfo = [
 
 $statistics = $statistics ?? [];
 $tables = $tables ?? [];
+$reservedTableIds = $reservedTableIds ?? [];
 $groupedTables = [];
 
+// Đồng bộ lịch đặt bàn vào trạng thái hiển thị
+foreach ($tables as &$table) {
+    $tableId = (int)($table['table_id'] ?? 0);
+
+    if (
+        $tableId > 0 &&
+        $table['status'] === 'Available' &&
+        in_array($tableId, $reservedTableIds, true)
+    ) {
+        $table['status'] = 'Reserved';
+    }
+}
+unset($table);
+$groupedTables = [];
 foreach ($tables as $table) {
     $areaId = $table['area_id'];
 
@@ -44,11 +59,28 @@ foreach ($tables as $table) {
 }
 
 $totalAreas = count($groupedTables);
-$totalTables = (int)($statistics['total'] ?? 0);
-$totalAvailable = (int)($statistics['available'] ?? 0);
-$totalOccupied = (int)($statistics['occupied'] ?? 0);
-$totalReserved = (int)($statistics['reserved'] ?? 0);
-$totalCleaning = (int)($statistics['cleaning'] ?? 0);
+
+$totalTables = count($tables);
+
+$totalAvailable = count(array_filter(
+    $tables,
+    fn($t) => $t['status'] === 'Available'
+));
+
+$totalOccupied = count(array_filter(
+    $tables,
+    fn($t) => $t['status'] === 'Occupied'
+));
+
+$totalReserved = count(array_filter(
+    $tables,
+    fn($t) => $t['status'] === 'Reserved'
+));
+
+$totalCleaning = count(array_filter(
+    $tables,
+    fn($t) => $t['status'] === 'Cleaning'
+));
 ?>
 
 <style>
@@ -784,6 +816,10 @@ $totalCleaning = (int)($statistics['cleaning'] ?? 0);
            href="index.php?c=booking&a=vip">
             <span>＋</span> Đặt bàn VIP
         </a>
+        <a class="rd-primary-btn"
+   href="index.php?c=booking&a=manage">
+    <span>⚙</span> Quản lý bàn
+</a>
     </header>
 
     <!-- THỐNG KÊ -->
