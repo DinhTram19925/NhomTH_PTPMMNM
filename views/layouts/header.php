@@ -26,6 +26,9 @@
             <a href="index.php?c=menu&a=index">🍽️ Thực đơn & Định lượng BOM (TV1)</a>
             <a href="index.php?c=menu&a=users">👥 Nhân sự & Phân quyền (TV1)</a>
             <a href="index.php?c=booking&a=index">📅 Sơ đồ bàn & Đặt bàn VIP (TV2)</a>
+            <a href="index.php?c=customer&a=index">👑 Hội viên VIP & Loyalty (TV2)</a>
+            <a href="index.php?c=promotion&a=index">   🎟️ Quản lý Voucher</a>
+            <a href="index.php?c=booking&a=report">📊 Báo cáo Booking & CRM</a>
             <a href="index.php?c=pos&a=index">💻 Bán hàng POS & Bếp KDS (TV3)</a>
             <a href="index.php?c=stock&a=index">📦 Kho & Bàn giao ca (TV4)</a>
             <a href="index.php?c=auth&a=logout" class="text-danger mt-4">🚪 Đăng xuất</a>
