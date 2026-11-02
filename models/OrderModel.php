@@ -8,7 +8,7 @@ class OrderModel {
         $this->db = Database::getConnection();
     }
 
-    // 1. Tạo đơn & Gọi món
+    // Tạo đơn & Gọi món
     public function createOrAddOrder($table_id, $waiter_id, $items) {
         $this->db->beginTransaction();
         try {
@@ -52,7 +52,7 @@ class OrderModel {
         }
     }
 
-    // 2. Hủy món (Chống gian lận)
+    // 2. Hủy món 
     public function cancelOrderItem($order_detail_id, $user_id, $reason) {
         $this->db->beginTransaction();
         try {
@@ -96,14 +96,13 @@ class OrderModel {
         return $this->db->query($sql)->fetchAll();
     }
 
-    // 4. Cập nhật KDS
-    public function updateKDSStatus($order_detail_id, $new_status) {
+    // 4. Cập nhật KDS (Waiting -> Cooking -> Ready)
+    public function updateKdsStatus($order_detail_id, $new_status) {
         $stmt = $this->db->prepare("UPDATE order_details SET kds_status = ? WHERE id = ?");
-        $stmt->execute([$new_status, $order_detail_id]);
-        return ['status' => 'success', 'message' => 'Đã cập nhật KDS'];
+        return $stmt->execute([$new_status, $order_detail_id]);
     }
 
-    // 5. Thanh toán & VietQR
+    // 5. Thanh toán & VietQR (Đã sửa lỗi toán học PHP)
     public function checkoutOrder($order_id, $cashier_id, $payment_method, $discount_amount = 0) {
         $this->db->beginTransaction();
         try {
@@ -117,16 +116,17 @@ class OrderModel {
             $stmt->execute([$order_id]);
             $order = $stmt->fetch();
 
-            $subtotal = $order['subtotal'];
-            $area_surcharge_percent = $order['surcharge_percent'] ?? 0;
-            $deposit_deducted = $order['deposit_amount'] ?? 0;
+            if (!$order) throw new Exception("Không tìm thấy đơn hàng!");
 
-            
+            $subtotal = (float)$order['subtotal'];
+            $area_surcharge_percent = (float)($order['surcharge_percent'] ?? 0);
+            $deposit_deducted = (float)($order['deposit_amount'] ?? 0);
+
             $area_surcharge_amount = $subtotal * ($area_surcharge_percent / 100);
             $service_charge_amount = ($subtotal + $area_surcharge_amount) * 0.05;
             $taxable_amount = $subtotal + $area_surcharge_amount + $service_charge_amount - $discount_amount;
             $vat_amount = max(0, $taxable_amount * 0.08);
-            $total_amount = $taxable_amount + $vat_amount - $deposit_deducted;
+            $total_amount = max(0, $taxable_amount + $vat_amount - $deposit_deducted);
 
             $stmtUpdate = $this->db->prepare("UPDATE orders SET 
                 area_surcharge_amount = ?, service_charge_amount = ?, discount_amount = ?, 
@@ -155,11 +155,10 @@ class OrderModel {
         }
     }
 
-    // 6. Chuyển bàn chuẩn theo ID Bàn 
+    // 6. Chuyển bàn / Gộp bàn
     public function transferTableByTableId($from_table_id, $to_table_id, $user_id) {
         $this->db->beginTransaction();
         try {
-            // Lấy đơn Open mới nhất của bàn nguồn
             $stmt = $this->db->prepare("SELECT id, order_code FROM orders WHERE table_id = ? AND status = 'Open' ORDER BY id DESC LIMIT 1");
             $stmt->execute([$from_table_id]);
             $fromOrder = $stmt->fetch();
@@ -167,13 +166,11 @@ class OrderModel {
             if (!$fromOrder) throw new Exception("Bàn nguồn hiện không có đơn hàng nào đang mở!");
             if ($from_table_id == $to_table_id) throw new Exception("Bàn mới phải khác bàn hiện tại!");
 
-            // Kiểm tra bàn đích xem có đơn Open nào chưa
             $stmtTo = $this->db->prepare("SELECT id FROM orders WHERE table_id = ? AND status = 'Open' ORDER BY id DESC LIMIT 1");
             $stmtTo->execute([$to_table_id]);
             $toOrder = $stmtTo->fetch();
 
             if ($toOrder) {
-                // Nếu bàn đích ĐÃ CÓ đơn -> Tự động chuyển thành GỘP BÀN
                 $to_order_id = $toOrder['id'];
                 $from_order_id = $fromOrder['id'];
 
@@ -181,13 +178,11 @@ class OrderModel {
                 $this->db->prepare("UPDATE orders SET status = 'Cancelled', closed_at = NOW() WHERE id = ?")->execute([$from_order_id]);
                 $this->db->prepare("UPDATE dining_tables SET status = 'Available' WHERE id = ?")->execute([$from_table_id]);
                 
-                // Tính lại tổng tiền
                 $this->db->prepare("UPDATE orders SET subtotal = (SELECT IFNULL(SUM(quantity * unit_price), 0) FROM order_details WHERE order_id = ? AND kds_status != 'Cancelled') WHERE id = ?")
                     ->execute([$to_order_id, $to_order_id]);
 
                 $msg = "Gộp bàn thành công!";
             } else {
-                // Nếu bàn đích TRỐNG -> CHUYỂN BÀN
                 $this->db->prepare("UPDATE orders SET table_id = ? WHERE id = ?")->execute([$to_table_id, $fromOrder['id']]);
                 $this->db->prepare("UPDATE dining_tables SET status = 'Available' WHERE id = ?")->execute([$from_table_id]);
                 $this->db->prepare("UPDATE dining_tables SET status = 'Occupied' WHERE id = ?")->execute([$to_table_id]);
@@ -195,7 +190,6 @@ class OrderModel {
                 $msg = "Chuyển bàn thành công!";
             }
 
-            // Ghi nhật ký hệ thống
             $this->db->prepare("INSERT INTO order_logs (order_id, user_id, action_type, description) VALUES (?, ?, 'TransferTable', ?)")
                 ->execute([$fromOrder['id'], $user_id, $msg . " Từ bàn ID {$from_table_id} sang bàn ID {$to_table_id}"]);
 
@@ -206,7 +200,8 @@ class OrderModel {
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
-// Lấy dữ liệu in hóa đơn 
+
+    // 7. Lấy dữ liệu in hóa đơn 
     public function getBillData($order_id) {
         $sqlOrder = "SELECT o.*, dt.table_name, a.name AS area_name, u.full_name AS waiter_name, c.full_name AS customer_name
                      FROM orders o
@@ -235,27 +230,43 @@ class OrderModel {
         ];
     }
 
-    // 8. Báo cáo doanh thu theo phương thức thanh toán
-    public function getReportByPaymentMethod() {
+    // 8. Báo cáo doanh thu theo phương thức thanh toán (Có Lọc Ngày)
+    public function getReportByPaymentMethod($fromDate = null, $toDate = null) {
         $sql = "SELECT payment_method, 
                        COUNT(id) AS transaction_count, 
                        IFNULL(SUM(amount), 0) AS total_revenue 
-                FROM payments 
-                GROUP BY payment_method";
-        return $this->db->query($sql)->fetchAll();
+                FROM payments";
+        $params = [];
+        if ($fromDate && $toDate) {
+            $sql .= " WHERE DATE(created_at) BETWEEN ? AND ?";
+            $params = [$fromDate, $toDate];
+        }
+        $sql .= " GROUP BY payment_method";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 
-    // 9. Báo cáo nhật ký Hủy Món (Giám sát chống gian lận)
-    public function getCancelLogsReport() {
+    // 9. Báo cáo nhật ký Hủy Món (Có Lọc Ngày)
+    public function getCancelLogsReport($fromDate = null, $toDate = null) {
         $sql = "SELECT ol.id, ol.order_id, u.full_name AS staff_name, ol.description, ol.created_at 
                 FROM order_logs ol 
                 LEFT JOIN users u ON ol.user_id = u.id 
-                WHERE ol.action_type = 'CancelItem' 
-                ORDER BY ol.id DESC";
-        return $this->db->query($sql)->fetchAll();
+                WHERE ol.action_type = 'CancelItem'";
+        $params = [];
+        if ($fromDate && $toDate) {
+            $sql .= " AND DATE(ol.created_at) BETWEEN ? AND ?";
+            $params = [$fromDate, $toDate];
+        }
+        $sql .= " ORDER BY ol.id DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 
-    // 10. Báo cáo doanh thu theo ca thu ngân (Cash Shifts)
+    // 10. Báo cáo ca thu ngân
     public function getShiftRevenueReport() {
         $sql = "SELECT cs.id AS shift_id, u.full_name AS cashier_name, cs.opened_at, cs.closed_at, 
                        cs.opening_cash, cs.total_cash_sales, cs.status
@@ -264,5 +275,4 @@ class OrderModel {
                 ORDER BY cs.id DESC";
         return $this->db->query($sql)->fetchAll();
     }
-   
 }

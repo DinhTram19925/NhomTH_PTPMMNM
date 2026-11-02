@@ -107,4 +107,27 @@ class PosController {
         echo json_encode($data);
         exit;
     }
+
+    public function updateKds() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $order_detail_id = $input['order_detail_id'] ?? 0;
+        $status = $input['status'] ?? '';
+
+        $allowedStatuses = ['Waiting', 'Cooking', 'Ready'];
+        if (!$order_detail_id || !in_array($status, $allowedStatuses)) {
+            echo json_encode(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ']);
+            exit;
+        }
+
+        $success = $this->orderModel->updateKdsStatus($order_detail_id, $status);
+        if ($success) {
+            echo json_encode(['status' => 'success', 'message' => "Đã chuyển trạng thái sang: {$status}"]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Lỗi cập nhật trạng thái']);
+        }
+        exit;
+    }
 }

@@ -15,6 +15,7 @@
     .kds-card { border-left: 4px solid var(--gold-primary); background: #22262b; transition: transform 0.2s; }
     .kds-card:hover { transform: translateY(-3px); }
     .badge-status { font-size: 0.8rem; padding: 6px 12px; border-radius: 20px; }
+    .btn-qty { padding: 2px 8px; font-size: 12px; font-weight: bold; }
 </style>
 
 <div class="container-fluid py-3">
@@ -25,7 +26,6 @@
             <small class="text-muted">Phân hệ TV3: Quản lý Order, KDS Điều phối bếp và Thanh toán chuẩn 5 sao</small>
         </div>
         
-        <!-- Nút Báo Cáo và Thanh chuyển Tab POS / KDS -->
         <div class="d-flex gap-2 align-items-center">
             <a href="index.php?c=pos&a=report" class="btn btn-outline-info btn-sm">📊 Xem Báo Cáo</a>
             <ul class="nav nav-pills bg-dark p-1 border border-secondary rounded-3" id="posTab" role="tablist">
@@ -40,7 +40,7 @@
     </div>
 
     <div class="tab-content" id="posTabContent">
-        <!-- TAB 1: POS GỌI MÓN & THANH TOÁN -->
+        <!-- POS GỌI MÓN & THANH TOÁN -->
         <div class="tab-pane fade show active" id="pos-panel">
             <div class="row g-4">
                 <!-- Chọn bàn & Thực đơn -->
@@ -69,44 +69,44 @@
                             </div>
                         </div>
 
-                        <!-- Danh sách 4 món ăn theo SQL -->
-                        <label class="form-label text-muted small">Chọn Món Ăn Thượng Hạng</label>
-                        <div class="row g-2 mb-3">
-                            <!-- Món 1 -->
-                            <div class="col-md-6">
+                        <!-- Danh sách món ăn -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label text-muted small m-0">Chọn Món Ăn Thượng Hạng</label>
+                            <input type="text" id="searchMenu" class="form-control form-control-sm bg-dark text-white border-secondary w-50" placeholder="🔍 Tìm món..." onkeyup="filterMenu()">
+                        </div>
+
+                        <div class="row g-2 mb-3" id="menuList">
+                            <div class="col-md-6 menu-item-card">
                                 <div class="p-3 border border-secondary rounded-3 bg-dark d-flex justify-content-between align-items-center">
                                     <div>
-                                        <div class="fw-bold text-white">Sò điệp Hokkaido áp chảo</div>
+                                        <div class="fw-bold text-white item-name">Sò điệp Hokkaido áp chảo</div>
                                         <small class="text-gold">450,000 VNĐ</small>
                                     </div>
                                     <button class="btn btn-sm btn-gold" onclick="addItemToCart(1, 'Sò điệp Hokkaido áp chảo', 450000)">+ Thêm</button>
                                 </div>
                             </div>
-                            <!-- Món 2 -->
-                            <div class="col-md-6">
+                            <div class="col-md-6 menu-item-card">
                                 <div class="p-3 border border-secondary rounded-3 bg-dark d-flex justify-content-between align-items-center">
                                     <div>
-                                        <div class="fw-bold text-white">Thăn bò Wagyu A5 đá muối</div>
+                                        <div class="fw-bold text-white item-name">Thăn bò Wagyu A5 đá muối</div>
                                         <small class="text-gold">1,850,000 VNĐ</small>
                                     </div>
                                     <button class="btn btn-sm btn-gold" onclick="addItemToCart(2, 'Thăn bò Wagyu A5 đá muối', 1850000)">+ Thêm</button>
                                 </div>
                             </div>
-                            <!-- Món 3 -->
-                            <div class="col-md-6">
+                            <div class="col-md-6 menu-item-card">
                                 <div class="p-3 border border-secondary rounded-3 bg-dark d-flex justify-content-between align-items-center">
                                     <div>
-                                        <div class="fw-bold text-white">Bánh Tiramisu phủ vàng 24K</div>
+                                        <div class="fw-bold text-white item-name">Bánh Tiramisu phủ vàng 24K</div>
                                         <small class="text-gold">290,000 VNĐ</small>
                                     </div>
                                     <button class="btn btn-sm btn-gold" onclick="addItemToCart(3, 'Bánh Tiramisu phủ vàng 24K', 290000)">+ Thêm</button>
                                 </div>
                             </div>
-                            <!-- Món 4 -->
-                            <div class="col-md-6">
+                            <div class="col-md-6 menu-item-card">
                                 <div class="p-3 border border-secondary rounded-3 bg-dark d-flex justify-content-between align-items-center">
                                     <div>
-                                        <div class="fw-bold text-white">Rượu vang Château Margaux</div>
+                                        <div class="fw-bold text-white item-name">Rượu vang Château Margaux</div>
                                         <small class="text-gold">650,000 VNĐ</small>
                                     </div>
                                     <button class="btn btn-sm btn-gold" onclick="addItemToCart(4, 'Rượu vang Château Margaux', 650000)">+ Thêm</button>
@@ -162,7 +162,7 @@
             </div>
         </div>
 
-        <!-- TAB 2: MÀN HÌNH ĐIỀU PHỐI BẾP (KDS) -->
+        <!-- MÀN HÌNH ĐIỀU PHỐI BẾP (KDS) -->
         <div class="tab-pane fade" id="kds-panel">
             <div class="card card-custom p-3 shadow-sm">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -189,6 +189,22 @@ function addItemToCart(id, name, price) {
     renderCart();
 }
 
+function updateQuantity(id, delta) {
+    const item = currentCart.find(i => i.menu_item_id === id);
+    if (item) {
+        item.quantity += delta;
+        if (item.quantity <= 0) {
+            currentCart = currentCart.filter(i => i.menu_item_id !== id);
+        }
+    }
+    renderCart();
+}
+
+function removeItemCart(id) {
+    currentCart = currentCart.filter(i => i.menu_item_id !== id);
+    renderCart();
+}
+
 function renderCart() {
     const container = document.getElementById('cartList');
     if (currentCart.length === 0) {
@@ -208,9 +224,15 @@ function renderCart() {
         subtotal += itemTotal;
         html += `
             <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center px-0">
-                <div>
+                <div style="max-width: 55%;">
                     <div><b>${item.name}</b></div>
-                    <small class="text-muted">${item.unit_price.toLocaleString()} đ x ${item.quantity}</small>
+                    <small class="text-muted">${item.unit_price.toLocaleString()} đ</small>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button class="btn btn-sm btn-outline-secondary btn-qty text-white" onclick="updateQuantity(${item.menu_item_id}, -1)">-</button>
+                    <span class="fw-bold px-1">${item.quantity}</span>
+                    <button class="btn btn-sm btn-outline-secondary btn-qty text-white" onclick="updateQuantity(${item.menu_item_id}, 1)">+</button>
+                    <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="removeItemCart(${item.menu_item_id})">🗑️</button>
                 </div>
                 <span class="text-gold fw-bold">${itemTotal.toLocaleString()} đ</span>
             </li>
@@ -230,6 +252,15 @@ function renderCart() {
     document.getElementById('surchargeText').innerText = surchargeAmount.toLocaleString() + ' VNĐ (' + surchargePercent + '%)';
     document.getElementById('serviceChargeText').innerText = serviceCharge.toLocaleString() + ' VNĐ';
     document.getElementById('totalText').innerText = total.toLocaleString() + ' VNĐ';
+}
+
+function filterMenu() {
+    const input = document.getElementById('searchMenu').value.toLowerCase();
+    const items = document.querySelectorAll('.menu-item-card');
+    items.forEach(item => {
+        const name = item.querySelector('.item-name').innerText.toLowerCase();
+        item.style.display = name.includes(input) ? '' : 'none';
+    });
 }
 
 function submitOrder() {
@@ -285,22 +316,57 @@ function loadKDS() {
 
         let html = '';
         data.forEach(item => {
+            let statusBadge = '';
+            let actionBtn = '';
+
+            if (item.kds_status === 'Waiting') {
+                statusBadge = '<span class="badge bg-warning text-dark badge-status">⏳ Chờ chế biến</span>';
+                actionBtn = `<button class="btn btn-sm btn-warning w-100 fw-bold text-dark mb-1" onclick="updateKdsStatusAction(${item.id}, 'Cooking')">👨‍🍳 Bắt đầu nấu</button>`;
+            } else if (item.kds_status === 'Cooking') {
+                statusBadge = '<span class="badge bg-info text-dark badge-status">🔥 Đang nấu</span>';
+                actionBtn = `<button class="btn btn-sm btn-success w-100 fw-bold mb-1" onclick="updateKdsStatusAction(${item.id}, 'Ready')">✅ Hoàn thành (Báo PV)</button>`;
+            } else if (item.kds_status === 'Ready') {
+                statusBadge = '<span class="badge bg-success text-white badge-status">🔔 Đã xong (Chờ bưng)</span>';
+                actionBtn = `<button class="btn btn-sm btn-secondary w-100 mb-1" disabled>✔️ Đã hoàn thành</button>`;
+            }
+
             html += `
                 <div class="col-md-4">
                     <div class="p-3 rounded-3 kds-card">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="badge bg-gold text-dark fw-bold">${item.table_name} (Đơn ID: ${item.order_id})</span>
-                            <span class="badge bg-warning text-dark badge-status">${item.kds_status}</span>
+                            ${statusBadge}
                         </div>
                         <h5 class="fw-bold text-white mb-1">${item.item_name} <span class="text-gold">x${item.quantity}</span></h5>
                         <p class="small text-muted mb-1">Ghi chú: ${item.modifier_notes || 'Không có'}</p>
                         <div class="small text-secondary mb-2">Món ID: ${item.id} | Gọi lúc: ${item.ordered_at}</div>
-                        <button class="btn btn-sm btn-outline-danger w-100" onclick="cancelItemAction(${item.id})">❌ Hủy Món</button>
+                        ${actionBtn}
+                        ${item.kds_status === 'Waiting' ? `<button class="btn btn-sm btn-outline-danger w-100" onclick="cancelItemAction(${item.id})">❌ Hủy Món</button>` : ''}
                     </div>
                 </div>
             `;
         });
         container.innerHTML = html;
+    });
+}
+
+// Hàm gọi API chuyển trạng thái KDS
+function updateKdsStatusAction(orderDetailId, newStatus) {
+    fetch('index.php?c=pos&a=updateKds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            order_detail_id: orderDetailId,
+            status: newStatus
+        })
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.status === 'success') {
+            loadKDS();
+        } else {
+            alert('❌ Lỗi: ' + res.message);
+        }
     });
 }
 
@@ -332,7 +398,7 @@ function showMergeModal() {
 }
 
 function cancelItemAction(orderDetailId) {
-    const reason = prompt("Nhập lý do hủy món (bắt buộc để ghi log):");
+    const reason = prompt("Nhập lý do hủy món :");
     if (!reason) return;
 
     fetch('index.php?c=pos&a=cancelItem', {
@@ -348,7 +414,7 @@ function cancelItemAction(orderDetailId) {
 }
 
 function printBillAction() {
-    const orderId = prompt("Nhập ID Đơn hàng cần in hóa đơn (Xem ID Đơn tại tab Bếp KDS):");
+    const orderId = prompt("Nhập ID Đơn hàng cần in hóa đơn :");
     if (!orderId) return;
     window.open(`index.php?c=pos&a=printBill&order_id=${orderId}`, '_blank', 'width=450,height=700');
 }
@@ -371,13 +437,8 @@ function checkoutAction() {
     .then(res => {
         if (res.status === 'success') {
             alert(`🎉 Thanh toán thành công! Tổng tiền: ${res.total_amount.toLocaleString()} VNĐ`);
-            
-            // 1. Tự động bật cửa sổ in Hóa đơn HTML/PDF
             window.open(`index.php?c=pos&a=printBill&order_id=${orderId}`, '_blank', 'width=450,height=700');
-            
-            // 2. Mở VietQR nếu có
             if (res.vietqr_url) window.open(res.vietqr_url, '_blank');
-            
             location.reload();
         } else {
             alert('❌ Lỗi thanh toán: ' + res.message);
