@@ -43,71 +43,13 @@ class TableModel
 
         return $this->db->query($sql)->fetch();
     }
-// Lấy danh sách khu vực và số bàn
-public function getAreas(): array
-{
-    $sql = "
-        SELECT
-            a.id,
-            a.name,
-            a.surcharge_percent,
-            COUNT(t.id) AS table_count
-        FROM areas a
-        LEFT JOIN dining_tables t ON t.area_id = a.id
-        GROUP BY a.id, a.name, a.surcharge_percent
-        ORDER BY a.id
-    ";
 
-    return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// Thêm khu vực
-public function addArea(string $name, float $surcharge): bool
-{
-    $stmt = $this->db->prepare(
-        "INSERT INTO areas (name, surcharge_percent)
-         VALUES (?, ?)"
-    );
-
-    return $stmt->execute([$name, $surcharge]);
-}
-
-// Sửa khu vực
-public function updateArea(
-    int $id,
-    string $name,
-    float $surcharge
-): bool {
-    $stmt = $this->db->prepare(
-        "UPDATE areas
-         SET name = ?, surcharge_percent = ?
-         WHERE id = ?"
-    );
-
-    return $stmt->execute([$name, $surcharge, $id]);
-}
-
-// Xóa khu vực nếu chưa có bàn
-public function deleteArea(int $id): bool
-{
-    $stmt = $this->db->prepare(
-        "SELECT COUNT(*) FROM dining_tables WHERE area_id = ?"
-    );
-
-    $stmt->execute([$id]);
-
-    if ((int)$stmt->fetchColumn() > 0) {
-        throw new InvalidArgumentException(
-            'Không thể xóa khu vực đang có bàn liên kết.'
-        );
+    public function getAreas(): array
+    {
+        return $this->db->query(
+            "SELECT id, name, surcharge_percent FROM areas ORDER BY id"
+        )->fetchAll();
     }
-
-    $stmt = $this->db->prepare(
-        "DELETE FROM areas WHERE id = ?"
-    );
-
-    return $stmt->execute([$id]);
-}
 
     public function addTable(
         int $areaId,

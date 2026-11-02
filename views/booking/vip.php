@@ -1,3 +1,4 @@
+
 <?php
 $statusLabels = [
     'Pending' => 'Chờ xác nhận',
@@ -7,10 +8,10 @@ $statusLabels = [
 ];
 
 $statusColors = [
-    'Pending' => '#d99b32',
-    'Confirmed' => '#168653',
-    'CheckedIn' => '#285fc4',
-    'Cancelled' => '#bd343e'
+    'Pending' => '#f59e0b',
+    'Confirmed' => '#16a34a',
+    'CheckedIn' => '#2563eb',
+    'Cancelled' => '#dc2626'
 ];
 
 function bookingEscape($value) {
@@ -19,322 +20,133 @@ function bookingEscape($value) {
 ?>
 
 <style>
-/* ROYALDINE 5S - VIP BOOKING */
-
-.rd-booking {
-    --gold: #d8b66c;
-    --gold-light: #f3dfaa;
-    --bg: #111925;
-    --panel: #1a2737;
-    --panel2: #202e40;
-    --border: #354458;
-    --text: #f4f5f7;
-    --muted: #a4b0c1;
-
-    box-sizing: border-box;
-    margin: 0;
-    padding: 28px;
-    min-height: 700px;
-    color: var(--text);
-    background:
-        radial-gradient(
-            ellipse at 90% 0%,
-            #29374a 0%,
-            transparent 38%
-        ),
-        var(--bg);
+.booking-page {
+    padding: 25px;
+    color: #1f2937;
+}
+.booking-page h2 {
+    margin-bottom: 5px;
+}
+.booking-subtitle {
+    color: #64748b;
+    margin-bottom: 25px;
+}
+.booking-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 14px;
-    font-family: "Segoe UI", Arial, sans-serif;
-}
-
-.rd-booking *,
-.rd-booking *::before,
-.rd-booking *::after {
-    box-sizing: border-box;
-}
-
-.rd-booking h2 {
-    margin: 0 0 8px;
-    color: var(--gold-light);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(27px, 3vw, 36px);
-    font-weight: 500;
-}
-
-.rd-booking h3 {
-    margin: 0 0 18px;
-    color: var(--gold-light);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 21px;
-    font-weight: 500;
-}
-
-.rd-booking .booking-subtitle {
-    margin: 0 0 25px;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.7;
-}
-
-/* CARD */
-
-.rd-booking .booking-card {
-    margin-bottom: 22px;
     padding: 22px;
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    background: linear-gradient(145deg, #202e40, #192434);
-    box-shadow: 0 10px 28px #00000018;
+    margin-bottom: 22px;
 }
-
-/* FORM */
-
-.rd-booking .booking-form {
+.booking-form {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit,minmax(210px,1fr));
+    gap: 15px;
 }
-
-.rd-booking .booking-field {
+.booking-field {
     display: flex;
-    min-width: 0;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
 }
-
-.rd-booking .booking-field label {
-    color: #d8dfe8;
-    font-size: 12px;
+.booking-field label {
     font-weight: 600;
+    font-size: 14px;
 }
-
-.rd-booking .booking-field input,
-.rd-booking .booking-field select,
-.rd-booking .booking-field textarea {
+.booking-field input,
+.booking-field select,
+.booking-field textarea {
     width: 100%;
-    min-width: 0;
-    padding: 11px 12px;
-    border: 1px solid #46566c;
+    box-sizing: border-box;
+    padding: 11px;
+    border: 1px solid #d1d5db;
     border-radius: 8px;
-    outline: none;
-    color: var(--text);
-    background: #121d2b;
-    font: 13px "Segoe UI", Arial, sans-serif;
-    color-scheme: dark;
-    transition: .2s;
+    font: inherit;
 }
-
-.rd-booking .booking-field input:focus,
-.rd-booking .booking-field select:focus,
-.rd-booking .booking-field textarea:focus {
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px #d8b66c18;
-}
-
-.rd-booking .booking-field input::placeholder,
-.rd-booking .booking-field textarea::placeholder {
-    color: #8492a5;
-}
-
-.rd-booking .booking-field textarea {
-    min-height: 88px;
+.booking-field textarea {
+    min-height: 85px;
     resize: vertical;
 }
-
-/* BUTTON */
-
-.rd-booking .booking-submit {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 42px;
-    padding: 11px 20px;
-    border: 1px solid #e7cd8c;
+.booking-submit {
+    background: #b9974b;
+    color: white;
+    border: 0;
     border-radius: 8px;
-    color: #171b21;
-    background: linear-gradient(135deg, #f1dba3, #c8a458);
-    font-size: 13px;
-    font-weight: 700;
+    padding: 12px 20px;
+    font-weight: bold;
     cursor: pointer;
-    transition: .2s;
 }
-
-.rd-booking .booking-submit:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.08);
+.booking-submit:hover {
+    background: #967735;
 }
-
-/* NOTIFICATION */
-
-.rd-booking .booking-success,
-.rd-booking .booking-error {
-    margin-bottom: 16px;
-    padding: 13px 15px;
+.booking-success {
+    background: #dcfce7;
+    color: #166534;
+    padding: 13px;
     border-radius: 8px;
-    font-size: 13px;
+    margin-bottom: 15px;
 }
-
-.rd-booking .booking-success {
-    border: 1px solid #287b61;
-    color: #9ce8c7;
-    background: #164333;
+.booking-error {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 13px;
+    border-radius: 8px;
+    margin-bottom: 15px;
 }
-
-.rd-booking .booking-error {
-    border: 1px solid #8e424b;
-    color: #ffc1c6;
-    background: #49252d;
-}
-
-/* BOOKING TABLE */
-
-.rd-booking .booking-table-wrap {
+.booking-table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 9px;
 }
-
-.rd-booking .booking-table {
+.booking-table {
     width: 100%;
-    min-width: 900px;
     border-collapse: collapse;
-    background: #182434;
+    min-width: 850px;
 }
-
-.rd-booking .booking-table th,
-.rd-booking .booking-table td {
-    padding: 13px 12px;
-    border-bottom: 1px solid var(--border);
-    color: #dce3ec;
+.booking-table th,
+.booking-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
     text-align: left;
+    font-size: 14px;
+}
+.booking-table th {
+    background: #f8fafc;
+}
+.booking-status {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 20px;
+    color: white;
     font-size: 12px;
     white-space: nowrap;
 }
-
-.rd-booking .booking-table th {
-    color: var(--gold-light);
-    background: #202e40;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.rd-booking .booking-table tbody tr {
-    transition: background .2s;
-}
-
-.rd-booking .booking-table tbody tr:hover {
-    background: #ffffff08;
-}
-
-.rd-booking .booking-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.rd-booking .booking-table strong {
-    color: var(--gold-light);
-}
-
-/* STATUS */
-
-.rd-booking .booking-status {
-    display: inline-block;
-    padding: 6px 10px;
-    border: 1px solid #ffffff20;
-    border-radius: 20px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-/* ACTIONS */
-
-.rd-booking .booking-actions {
+.booking-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
-
-.rd-booking .booking-actions form {
-    margin: 0;
-}
-
-.rd-booking .booking-actions button {
-    min-height: 30px;
-    padding: 7px 10px;
-    border: 1px solid transparent;
+.booking-actions button {
+    border: 0;
     border-radius: 6px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
+    padding: 7px 9px;
     cursor: pointer;
-    transition: .2s;
+    color: white;
 }
+.booking-confirm { background: #16a34a; }
+.booking-checkin { background: #2563eb; }
+.booking-cancel { background: #dc2626; }
 
-.rd-booking .booking-actions button:hover {
-    filter: brightness(1.12);
-    transform: translateY(-1px);
-}
-
-.rd-booking .booking-confirm {
-    background: #168653;
-}
-
-.rd-booking .booking-checkin {
-    background: #285fc4;
-}
-
-.rd-booking .booking-cancel {
-    background: #bd343e;
-}
-
-/* BACK LINK */
-
-.rd-booking > a {
-    display: inline-flex;
-    margin-top: 2px;
-    color: var(--gold);
-    font-size: 13px;
-    text-decoration: none;
-}
-
-.rd-booking > a:hover {
-    color: var(--gold-light);
-}
-
-/* RESPONSIVE */
-
-@media (max-width: 1050px) {
-    .rd-booking .booking-form {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 700px) {
-    .rd-booking {
-        padding: 16px;
-    }
-
-    .rd-booking .booking-card {
-        padding: 15px;
-    }
-
-    .rd-booking .booking-form {
-        grid-template-columns: 1fr;
-    }
+@media(max-width:700px) {
+    .booking-page { padding: 12px; }
+    .booking-card { padding: 15px; }
 }
 </style>
 
-<div class="rd-booking">
+<div class="booking-page">
 
-    <!-- TIÊU ĐỀ -->
     <h2>Đặt bàn VIP</h2>
-
     <p class="booking-subtitle">
         Quản lý thông tin khách hàng và lịch đặt bàn nhà hàng RoyalDine 5S.
     </p>
 
-    <!-- THÔNG BÁO -->
     <?php if (!empty($error)): ?>
         <div class="booking-error">
             <?= bookingEscape($error) ?>
@@ -350,7 +162,7 @@ function bookingEscape($value) {
     <!-- FORM TẠO ĐẶT BÀN -->
     <section class="booking-card">
 
-        <h3>＋ Tạo đặt bàn mới</h3>
+        <h3>Tạo đặt bàn mới</h3>
 
         <form method="POST" class="booking-form">
 
@@ -387,23 +199,15 @@ function bookingEscape($value) {
 
             <div class="booking-field">
                 <label>Chọn bàn *</label>
-
                 <select name="table_id" required>
                     <option value="">-- Chọn bàn --</option>
 
                     <?php foreach ($tables as $table): ?>
-                        <option
-                            value="<?= (int)$table['id'] ?>"
-                            <?= (
-                                isset($_GET['table_id'])
-                                && (int)$_GET['table_id'] === (int)$table['id']
-                            ) ? 'selected' : '' ?>>
-
+                        <option value="<?= (int)$table['id'] ?>">
                             <?= bookingEscape($table['table_name']) ?>
                             -
                             <?= bookingEscape($table['area_name']) ?>
                             (<?= (int)$table['capacity'] ?> khách)
-
                         </option>
                     <?php endforeach; ?>
 
@@ -412,7 +216,6 @@ function bookingEscape($value) {
 
             <div class="booking-field">
                 <label>Ngày giờ đặt *</label>
-
                 <input
                     type="datetime-local"
                     name="booking_time"
@@ -422,7 +225,6 @@ function bookingEscape($value) {
 
             <div class="booking-field">
                 <label>Số lượng khách *</label>
-
                 <input
                     type="number"
                     name="guest_count"
@@ -434,7 +236,6 @@ function bookingEscape($value) {
 
             <div class="booking-field">
                 <label>Tiền đặt cọc (VNĐ)</label>
-
                 <input
                     type="number"
                     name="deposit_amount"
@@ -445,7 +246,6 @@ function bookingEscape($value) {
 
             <div class="booking-field">
                 <label>Yêu cầu đặc biệt</label>
-
                 <textarea
                     name="special_request"
                     placeholder="Sinh nhật, trang trí bàn, yêu cầu riêng..."></textarea>
@@ -453,7 +253,7 @@ function bookingEscape($value) {
 
             <div style="grid-column:1/-1">
                 <button class="booking-submit" type="submit">
-                    ＋ Tạo đặt bàn
+                    + Tạo đặt bàn
                 </button>
             </div>
 
@@ -485,178 +285,120 @@ function bookingEscape($value) {
 
                 <tbody>
 
-                    <?php if (empty($reservations)): ?>
+                <?php if (empty($reservations)): ?>
+
+                    <tr>
+                        <td colspan="9" style="text-align:center">
+                            Chưa có dữ liệu đặt bàn.
+                        </td>
+                    </tr>
+
+                <?php else: ?>
+
+                    <?php foreach ($reservations as $reservation): ?>
+
+                        <?php
+                        $status = $reservation['status'];
+                        $color = $statusColors[$status] ?? '#64748b';
+                        ?>
 
                         <tr>
-                            <td colspan="9" style="text-align:center">
-                                Chưa có dữ liệu đặt bàn.
+
+                            <td>
+                                <strong>
+                                    <?= bookingEscape($reservation['booking_code']) ?>
+                                </strong>
                             </td>
+
+                            <td>
+                                <?= bookingEscape($reservation['full_name']) ?>
+                            </td>
+
+                            <td>
+                                <?= bookingEscape($reservation['phone']) ?>
+                            </td>
+
+                            <td>
+                                <?= bookingEscape($reservation['table_name'] ?? 'Chưa chọn') ?>
+                            </td>
+
+                            <td>
+                                <?= bookingEscape($reservation['booking_time']) ?>
+                            </td>
+
+                            <td>
+                                <?= (int)$reservation['guest_count'] ?>
+                            </td>
+
+                            <td>
+                                <?= number_format((float)$reservation['deposit_amount'], 0, ',', '.') ?> đ
+                            </td>
+
+                            <td>
+                                <span
+                                    class="booking-status"
+                                    style="background:<?= $color ?>">
+                                    <?= bookingEscape($statusLabels[$status] ?? $status) ?>
+                                </span>
+                            </td>
+
+                            <td>
+
+                                <div class="booking-actions">
+
+                                    <?php if ($status === 'Pending'): ?>
+
+                                        <form method="POST">
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$reservation['id'] ?>">
+                                            <input type="hidden" name="status" value="Confirmed">
+
+                                            <button class="booking-confirm" type="submit">
+                                                Xác nhận
+                                            </button>
+                                        </form>
+
+                                    <?php endif; ?>
+
+                                    <?php if ($status === 'Confirmed'): ?>
+
+                                        <form method="POST">
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$reservation['id'] ?>">
+                                            <input type="hidden" name="status" value="CheckedIn">
+
+                                            <button class="booking-checkin" type="submit">
+                                                Check-in
+                                            </button>
+                                        </form>
+
+                                    <?php endif; ?>
+
+                                    <?php if (in_array($status, ['Pending', 'Confirmed'], true)): ?>
+
+                                        <form method="POST"
+                                              onsubmit="return confirm('Bạn có chắc muốn hủy đặt bàn này?')">
+
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$reservation['id'] ?>">
+                                            <input type="hidden" name="status" value="Cancelled">
+
+                                            <button class="booking-cancel" type="submit">
+                                                Hủy
+                                            </button>
+                                        </form>
+
+                                    <?php endif; ?>
+
+                                </div>
+
+                            </td>
+
                         </tr>
 
-                    <?php else: ?>
+                    <?php endforeach; ?>
 
-                        <?php foreach ($reservations as $reservation): ?>
-
-                            <?php
-                            $status = $reservation['status'];
-                            $color = $statusColors[$status] ?? '#64748b';
-                            ?>
-
-                            <tr>
-
-                                <td>
-                                    <strong>
-                                        <?= bookingEscape($reservation['booking_code']) ?>
-                                    </strong>
-                                </td>
-
-                                <td>
-                                    <?= bookingEscape($reservation['full_name']) ?>
-                                </td>
-
-                                <td>
-                                    <?= bookingEscape($reservation['phone']) ?>
-                                </td>
-
-                                <td>
-                                    <?= bookingEscape($reservation['table_name'] ?? 'Chưa chọn') ?>
-                                </td>
-
-                                <td>
-                                    <?= bookingEscape($reservation['booking_time']) ?>
-                                </td>
-
-                                <td>
-                                    <?= (int)$reservation['guest_count'] ?>
-                                </td>
-
-                                <td>
-                                    <?= number_format(
-                                        (float)$reservation['deposit_amount'],
-                                        0,
-                                        ',',
-                                        '.'
-                                    ) ?> đ
-                                </td>
-
-                                <td>
-                                    <span
-                                        class="booking-status"
-                                        style="background:<?= $color ?>">
-
-                                        <?= bookingEscape(
-                                            $statusLabels[$status] ?? $status
-                                        ) ?>
-
-                                    </span>
-                                </td>
-
-                                <td>
-
-                                    <div class="booking-actions">
-
-                                        <?php if ($status === 'Pending'): ?>
-
-                                            <form method="POST">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="action"
-                                                    value="status">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int)$reservation['id'] ?>">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="status"
-                                                    value="Confirmed">
-
-                                                <button
-                                                    class="booking-confirm"
-                                                    type="submit">
-                                                    Xác nhận
-                                                </button>
-
-                                            </form>
-
-                                        <?php endif; ?>
-
-                                        <?php if ($status === 'Confirmed'): ?>
-
-                                            <form method="POST">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="action"
-                                                    value="status">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int)$reservation['id'] ?>">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="status"
-                                                    value="CheckedIn">
-
-                                                <button
-                                                    class="booking-checkin"
-                                                    type="submit">
-                                                    Check-in
-                                                </button>
-
-                                            </form>
-
-                                        <?php endif; ?>
-
-                                        <?php if (in_array(
-                                            $status,
-                                            ['Pending', 'Confirmed'],
-                                            true
-                                        )): ?>
-
-                                            <form
-                                                method="POST"
-                                                onsubmit="return confirm('Bạn có chắc muốn hủy đặt bàn này?')">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="action"
-                                                    value="status">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int)$reservation['id'] ?>">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="status"
-                                                    value="Cancelled">
-
-                                                <button
-                                                    class="booking-cancel"
-                                                    type="submit">
-                                                    Hủy
-                                                </button>
-
-                                            </form>
-
-                                        <?php endif; ?>
-
-                                    </div>
-
-                                </td>
-
-                            </tr>
-
-                        <?php endforeach; ?>
-
-                    <?php endif; ?>
+                <?php endif; ?>
 
                 </tbody>
 

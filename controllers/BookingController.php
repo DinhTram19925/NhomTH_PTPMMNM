@@ -26,129 +26,80 @@ public function index()
 
     // QUẢN LÝ BÀN
     public function manage()
-{
-    $this->requireRole(['ADMIN']);
+    {
+        $this->requireRole(['ADMIN']);
 
-    $model = new TableModel();
-    $error = '';
+        $model = new TableModel();
+        $error = '';
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $action = $_POST['action'] ?? '';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $action = $_POST['action'] ?? '';
 
-        try {
-            // =========================
-            // QUẢN LÝ KHU VỰC
-            // =========================
-            if ($action === 'area_add') {
-                $name = trim($_POST['name'] ?? '');
-                $surcharge = (float)($_POST['surcharge_percent'] ?? 0);
+            try {
+                if ($action === 'add' || $action === 'update') {
+                    $areaId = (int)($_POST['area_id'] ?? 0);
+                    $name = trim($_POST['table_name'] ?? '');
+                    $capacity = (int)($_POST['capacity'] ?? 0);
 
-                if ($name === '' || $surcharge < 0 || $surcharge > 100) {
-                    throw new InvalidArgumentException(
-                        'Tên khu vực hoặc phụ thu không hợp lệ.'
-                    );
-                }
-
-                $model->addArea($name, $surcharge);
-
-            } elseif ($action === 'area_update') {
-                $id = (int)($_POST['id'] ?? 0);
-                $name = trim($_POST['name'] ?? '');
-                $surcharge = (float)($_POST['surcharge_percent'] ?? 0);
-
-                if ($id <= 0 || $name === '' ||
-                    $surcharge < 0 || $surcharge > 100) {
-                    throw new InvalidArgumentException(
-                        'Thông tin khu vực không hợp lệ.'
-                    );
-                }
-
-                $model->updateArea($id, $name, $surcharge);
-
-            } elseif ($action === 'area_delete') {
-                $id = (int)($_POST['id'] ?? 0);
-
-                if ($id <= 0) {
-                    throw new InvalidArgumentException(
-                        'Khu vực không hợp lệ.'
-                    );
-                }
-
-                $model->deleteArea($id);
-
-            // =========================
-            // THÊM / SỬA BÀN
-            // =========================
-            } elseif ($action === 'add' || $action === 'update') {
-                $areaId = (int)($_POST['area_id'] ?? 0);
-                $name = trim($_POST['table_name'] ?? '');
-                $capacity = (int)($_POST['capacity'] ?? 0);
-
-                if ($areaId <= 0 || $name === '' ||
-                    $capacity < 1 || $capacity > 100) {
-                    throw new InvalidArgumentException(
-                        'Thông tin bàn không hợp lệ.'
-                    );
-                }
-
-                if ($action === 'add') {
-                    $model->addTable($areaId, $name, $capacity);
-                } else {
-                    $id = (int)($_POST['id'] ?? 0);
-
-                    if ($id <= 0 || !$model->findTable($id)) {
+                    if ($areaId <= 0 || $name === '' ||
+                        $capacity < 1 || $capacity > 100) {
                         throw new InvalidArgumentException(
-                            'Bàn cần sửa không tồn tại.'
+                            'Thông tin bàn không hợp lệ.'
                         );
                     }
 
-                    $model->updateTable($id, $areaId, $name, $capacity);
-                }
+                    if ($action === 'add') {
+                        $model->addTable($areaId, $name, $capacity);
+                    } else {
+                        $id = (int)($_POST['id'] ?? 0);
 
-            // =========================
-            // CẬP NHẬT TRẠNG THÁI BÀN
-            // =========================
-            } elseif ($action === 'status') {
-                $id = (int)($_POST['id'] ?? 0);
-                $status = $_POST['status'] ?? '';
+                        if ($id <= 0 || !$model->findTable($id)) {
+                            throw new InvalidArgumentException(
+                                'Bàn cần sửa không tồn tại.'
+                            );
+                        }
 
-                if ($id <= 0 || !$model->findTable($id)) {
+                        $model->updateTable($id, $areaId, $name, $capacity);
+                    }
+
+                } elseif ($action === 'status') {
+                    $id = (int)($_POST['id'] ?? 0);
+                    $status = $_POST['status'] ?? '';
+
+                    if ($id <= 0 || !$model->findTable($id)) {
+                        throw new InvalidArgumentException(
+                            'Bàn không tồn tại.'
+                        );
+                    }
+
+                    if (!$model->updateStatus($id, $status)) {
+                        throw new InvalidArgumentException(
+                            'Trạng thái bàn không hợp lệ.'
+                        );
+                    }
+
+                } else {
                     throw new InvalidArgumentException(
-                        'Bàn không tồn tại.'
+                        'Thao tác không hợp lệ.'
                     );
                 }
 
-                if (!$model->updateStatus($id, $status)) {
-                    throw new InvalidArgumentException(
-                        'Trạng thái bàn không hợp lệ.'
-                    );
-                }
+                header('Location: index.php?c=booking&a=manage&success=1');
+                exit;
 
-            } else {
-                throw new InvalidArgumentException(
-                    'Thao tác không hợp lệ.'
-                );
+            } catch (InvalidArgumentException $e) {
+                $error = $e->getMessage();
+            } catch (PDOException $e) {
+                $error = 'Không thể lưu dữ liệu bàn.';
             }
-
-            header('Location: index.php?c=booking&a=manage&success=1');
-            exit;
-
-        } catch (InvalidArgumentException $e) {
-            $error = $e->getMessage();
-
-        } catch (PDOException $e) {
-            $error = 'Không thể lưu dữ liệu bàn hoặc khu vực.';
         }
+
+        $tables = $model->getAllTables();
+        $areas = $model->getAreas();
+
+        $this->render('booking/manage', compact('tables', 'areas', 'error'));
     }
 
-    $tables = $model->getAllTables();
-    $areas = $model->getAreas();
-
-    $this->render(
-        'booking/manage',
-        compact('tables', 'areas', 'error')
-    );
-}
     // ĐẶT BÀN VIP
     public function vip()
     {
@@ -296,22 +247,4 @@ public function index()
             compact('reservations', 'tables', 'error', 'success')
         );
     }
-
-    
-    // BAO CAO BOOKING VA CRM
-    public function report(): void
-    {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
-
-        $model = new ReservationModel();
-
-        $bookingStats = $model->getBookingStatistics();
-        $topCustomers = $model->getTopVipCustomers();
-
-        $this->render('booking/report', [
-            'bookingStats' => $bookingStats,
-            'topCustomers' => $topCustomers
-        ]);
-    }
-
 }

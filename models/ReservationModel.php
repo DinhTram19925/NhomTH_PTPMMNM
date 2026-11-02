@@ -29,50 +29,6 @@ class ReservationModel
         ";
 
         return $this->db->query($sql)->fetchAll();
-        
-    }
-
-    // Thong ke dat ban theo trang thai
-    public function getBookingStatistics(): array
-    {
-        $sql = "
-            SELECT
-                COUNT(*) AS total_bookings,
-                SUM(status = 'Pending') AS pending,
-                SUM(status = 'Confirmed') AS confirmed,
-                SUM(status = 'CheckedIn') AS checked_in,
-                SUM(status = 'Cancelled') AS cancelled,
-                COALESCE(SUM(
-                    CASE WHEN status = 'CheckedIn'
-                    THEN deposit_amount ELSE 0 END
-                ), 0) AS checked_in_deposit,
-                COALESCE(SUM(
-                    CASE WHEN status = 'Cancelled'
-                    THEN deposit_amount ELSE 0 END
-                ), 0) AS cancelled_deposit
-            FROM reservations
-        ";
-
-        return $this->db->query($sql)->fetch(PDO::FETCH_ASSOC);
-    }
-
-    // Top 10 khach hang chi tieu cao nhat
-    public function getTopVipCustomers(): array
-    {
-        $sql = "
-            SELECT
-                id,
-                full_name,
-                phone,
-                tier,
-                points,
-                total_spent
-            FROM customers
-            ORDER BY total_spent DESC
-            LIMIT 10
-        ";
-
-        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     // Lấy danh sách bàn

@@ -6,7 +6,7 @@ class PosController {
 
     public function __construct() {
         // Đã sửa $this.orderModel thành $this->orderModel
-        $this->orderModel = new OrderModel(); 
+        $this->orderModel = new OrderModel();
     }
 
     public function index() {

@@ -1085,6 +1085,18 @@ $totalCleaning = count(array_filter(
         </div>
 
     </div>
+
+    <div class="rd-floorplan-note">
+        <strong style="color:var(--rd-gold)">
+            ROYALDINE SERVICE
+        </strong>
+        <br>
+        Sơ đồ hiển thị bàn và trạng thái hiện tại từ cơ sở dữ liệu.
+        Bố cục phòng là minh họa giao diện, chưa phải bản vẽ theo kích thước
+        thực tế. Việc kiểm tra bàn trống theo khung giờ sẽ được xử lý trong
+        chức năng đặt bàn.
+    </div>
+
 </div>
 
 <script>
