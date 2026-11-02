@@ -1,6 +1,4 @@
-<!-- ================= LỊCH SỬ GIAO DỊCH KHO ================= -->
 <style>
-    /* CSS cho 2 nút thao tác */
     .btn-action-edit, .btn-action-cancel {
         color: #6c757d; 
         border: 1px solid #dee2e6; 
@@ -8,20 +6,17 @@
         transition: all 0.2s ease-in-out;
         text-decoration: none;
     }
-    /* Khi hover nút Sửa -> Nền Vàng kim, Icon Trắng */
     .btn-action-edit:hover {
         background-color: #c9a050; 
         border-color: #c9a050; 
         color: #ffffff;
     }
-    /* Khi hover nút Hủy -> Nền Đỏ, Icon Trắng */
     .btn-action-cancel:hover {
         background-color: #dc3545; 
         border-color: #dc3545; 
         color: #ffffff;
     }
     
-    /* CSS Phân trang */
     .pagination-custom .page-link { color: #000; border-color: #dee2e6; }
     .pagination-custom .page-item.active .page-link { background-color: #c9a050; border-color: #c9a050; color: white; font-weight: bold; }
     .pagination-custom .page-link:hover { background-color: #f1ebd8; color: #000; }
@@ -29,7 +24,6 @@
 </style>
 
 <div class="lux-card p-3 mb-4 d-flex justify-content-between align-items-center">
-    <!-- Form Lọc -->
     <form method="GET" action="index.php" class="d-flex gap-2 w-75">
         <input type="hidden" name="c" value="stock">
         <input type="hidden" name="a" value="index">
@@ -54,7 +48,6 @@
     </form>
 </div>
 
-<!-- BẢNG LỊCH SỬ -->
 <div class="lux-card mb-4">
     <div class="table-responsive m-0">
         <table class="table lux-table align-middle mb-0">
@@ -86,38 +79,58 @@
                             <span class="badge bg-success bg-opacity-10 text-success px-3 py-1 border border-success rounded-pill">Nhập kho</span>
                             
                         <?php elseif ($rtype == 'audit_adjust' || strpos($rtype, 'kiểm') !== false): ?>
-                            <!-- Nhận diện Phiếu Kiểm kê -->
                             <span class="badge bg-warning bg-opacity-10 text-dark px-3 py-1 border border-warning rounded-pill">Kiểm kê</span>
                             
                         <?php else: ?>
-                            <!-- Mặc định còn lại là Phiếu Xuất -->
                             <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-1 border border-danger rounded-pill">Xuất kho</span>
                             
                         <?php endif; ?>
                     </td>
                     
-                    <!-- Cột người lập phiếu -->
                     <td class="text-muted fw-semibold">
                         <?= htmlspecialchars($item['creator_name'] ?? $item['created_by'] ?? $item['user_id'] ?? 'Không xác định') ?>
                     </td>
                     
-                    <!-- Cột thời gian tạo -->
                     <td class="fw-bold text-dark"><?= date('H:i - d/m/Y', strtotime($item['created_at'])) ?></td>
-                    
-                    <!-- CỘT THAO TÁC: Chỉ 1 nút Xem chi tiết (Hover vàng) -->
-                    <!-- CỘT THAO TÁC: Dùng chung link của Dashboard -->
-                    <td class="text-center pe-4 d-flex justify-content-center">
-                        <a href="index.php?c=stock_receipt&a=show&id=<?= (int)$item['id'] ?>" class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;" title="Xem chi tiết">
-                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        </a>
-                    </td>
+
+                    <td class="text-center pe-4 d-flex justify-content-center gap-2">
+    
+    <!-- 1. NÚT XEM CHI TIẾT (ADMIN, STOCK, CHEF đều thấy) -->
+    <a href="index.php?c=stock_receipt&a=show&id=<?= (int)$item['id'] ?>" 
+       class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" 
+       style="width: 34px; height: 34px; border: 1px solid #dee2e6; color: #6c757d; background-color: #fff; transition: all 0.2s; text-decoration: none;" 
+       onmouseover="this.style.backgroundColor='#c9a050'; this.style.borderColor='#c9a050'; this.style.color='#fff';" 
+       onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#dee2e6'; this.style.color='#6c757d';"
+       title="Xem chi tiết">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+    </a>
+
+    <!-- 2. NÚT HỦY PHIẾU: CHỈ MỘT MÌNH ADMIN MỚI THẤY VÀ THỰC HIỆN -->
+    <?php if ($role === 'ADMIN'): ?>
+        <a href="index.php?c=stock_receipt&a=delete&id=<?= (int)$item['id'] ?>" 
+           class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" 
+           style="width: 34px; height: 34px; border: 1px solid #dee2e6; color: #6c757d; background-color: #fff; transition: all 0.2s; text-decoration: none;" 
+           onmouseover="this.style.backgroundColor='#dc3545'; this.style.borderColor='#dc3545'; this.style.color='#fff';" 
+           onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#dee2e6'; this.style.color='#6c757d';"
+           onclick="return confirm('⚠️ CẢNH BÁO: Hủy phiếu sẽ hoàn trả lại số lượng trong kho. Bạn có chắc chắn?');"
+           title="Hủy phiếu">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+            </svg>
+        </a>
+    <?php endif; ?>
+
+</td>
                 </tr>
                 <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
     
-    <!-- PHÂN TRANG 10 DÒNG -->
     <?php if(!empty($history_list) && isset($maxPage_hist) && $maxPage_hist > 1): 
         $queryParams = $_GET;
         unset($queryParams['page_hist']);

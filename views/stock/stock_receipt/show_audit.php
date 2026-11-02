@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chi Tiết Phiếu Kiểm Kê - RoyalDine 5S</title>
-    <!-- Thư viện Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f1f2f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -27,7 +26,6 @@
         
         .text-gold { color: #c9a050; }
         
-        /* Nút In phiếu */
         .btn-print { 
             background-color: #1a1d20; 
             color: #c9a050; 
@@ -40,7 +38,6 @@
             color: #ffdf8a; 
         }
 
-        /* Nút Quay lại */
         .btn-outline-gold {
             background-color: #ffffff;
             color: #495057;
@@ -54,7 +51,6 @@
             background-color: #fffaf0;
         }
 
-        /* Tùy chỉnh bảng */
         .table-custom th {
             background-color: #1a1d20 !important;
             color: #c9a050 !important;
@@ -68,7 +64,6 @@
             border: 1px solid #dee2e6;
         }
 
-        /* Chế độ in ấn */
         @media print {
             body { background-color: #fff; }
             .receipt-container { box-shadow: none; padding: 0; margin: 0; max-width: 100%; border-top: none; }
@@ -81,10 +76,8 @@
 <body>
 
 <div class="container py-2">
-    <!-- KHUNG GIẤY A4 BIÊN BẢN -->
     <div class="receipt-container">
         
-        <!-- Nút bấm đặt bên TRONG khung giấy (Ẩn khi in) -->
         <div class="d-flex justify-content-between mb-4 no-print">
             <?php 
                 $backUrl = (isset($_GET['from']) && $_GET['from'] === 'history') 
@@ -97,7 +90,6 @@
             </button>
         </div>
 
-        <!-- Header Phiếu -->
         <div class="d-flex justify-content-between align-items-end mt-2">
             <div>
                 <h2 class="fw-bold mb-2 text-uppercase" style="font-size: 2.2rem; letter-spacing: 0.5px;">PHIẾU KIỂM KÊ KHO</h2>
@@ -109,10 +101,8 @@
             </div>
         </div>
         
-        <!-- Đường viền vàng phân cách -->
         <div class="receipt-divider"></div>
 
-        <!-- Khối Thông tin 2 bên -->
         <div class="row mb-4">
             <div class="col-md-6">
                 <div class="p-3 bg-light rounded-3 h-100 border">
@@ -142,12 +132,10 @@
             </div>
         </div>
         
-        <!-- Ghi chú chung -->
         <p class="mb-4 text-dark" style="font-size: 0.95rem;">
             <span class="fw-bold">Ghi chú chung:</span> <em class="text-muted"><?= htmlspecialchars($receipt['note'] ?? 'Không có') ?></em>
         </p>
 
-        <!-- Bảng Chi Tiết Mặt Hàng Chênh Lệch & Lý Do -->
         <table class="table align-middle mb-5 table-custom">
             <thead class="text-center">
                 <tr>
@@ -176,12 +164,10 @@
                         <td class="fw-bold text-dark ps-3"><?= htmlspecialchars($detail['ingredient_name']) ?></td>
                         <td class="text-center text-dark fw-bold"><?= htmlspecialchars($detail['unit']) ?></td>
                         
-                        <!-- Độ lệch -->
                         <td class="text-center fw-bold <?= $qty > 0 ? 'text-success' : 'text-danger' ?>" style="font-size: 1.05rem;">
                             <?= $qty > 0 ? '+' : '' ?><?= number_format($qty, 2) ?>
                         </td>
                         
-                        <!-- Cột Lý do chi tiết -->
                         <td class="text-start ps-3 text-muted small">
                             <?= htmlspecialchars($detail['reason'] ?? $detail['note'] ?? '-') ?>
                         </td>
@@ -191,7 +177,6 @@
             </tbody>
         </table>
         
-        <!-- Khu vực Chữ ký -->
         <div class="row mt-5 pt-3 text-center no-print">
             <div class="col-4">
                 <p class="fw-bold mb-5">Người lập phiếu</p>

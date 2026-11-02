@@ -50,3 +50,14 @@ INSERT INTO `stock_receipt_details` (`stock_receipt_id`, `ingredient_id`, `quant
 UPDATE stock_receipts 
 SET receipt_type = 'Export_Sale' 
 WHERE receipt_code LIKE 'VX%' AND (receipt_type IS NULL OR receipt_type = '');
+
+CREATE TABLE IF NOT EXISTS `cash_transactions` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `shift_id` INT NOT NULL COMMENT 'Liên kết đến ca làm việc hiện tại',
+    `type` ENUM('IN', 'OUT') NOT NULL COMMENT 'IN = Phiếu Thu, OUT = Phiếu Chi',
+    `amount` DECIMAL(15,2) NOT NULL COMMENT 'Số tiền phát sinh',
+    `note` TEXT COMMENT 'Lý do thu / chi',
+    `creator` VARCHAR(100) COMMENT 'Tên nhân viên lập phiếu',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Thời gian lập',
+    FOREIGN KEY (`shift_id`) REFERENCES `cash_shifts`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

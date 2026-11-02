@@ -8,34 +8,40 @@ class StockController {
         $this->stockModel = new StockModel();
     }
 
+    private function checkAccess($allowedRoles) {
+        $currentRole = $_SESSION['user']['role_code'] ?? '';
+        
+        if ($currentRole === 'ADMIN') return true;
+
+        if (!in_array($currentRole, $allowedRoles)) {
+            echo "<script>alert('❌ BẠN KHÔNG CÓ QUYỀN TRUY CẬP CHỨC NĂNG NÀY!'); window.location.href='index.php?c=menu&a=dashboard';</script>";
+            exit;
+        }
+    }
+
     public function index() {
-        $active_tab = isset($_REQUEST['tab']) ? trim($_REQUEST['tab']) : 'dashboard'; // Mặc định mở Tổng quan
+        $active_tab = isset($_REQUEST['tab']) ? trim($_REQUEST['tab']) : 'dashboard'; 
         $search = isset($_REQUEST['search']) ? trim($_REQUEST['search']) : '';
         
-        // Bắt thêm các bộ lọc từ giao diện
         $group_filter = isset($_REQUEST['group_filter']) ? trim($_REQUEST['group_filter']) : '';
         $unit_filter = isset($_REQUEST['unit_filter']) ? trim($_REQUEST['unit_filter']) : '';
         $status_filter = isset($_REQUEST['status_filter']) ? trim($_REQUEST['status_filter']) : '';
         
-        $limit = 10; // Cố định 10 dòng trên 1 trang
+        $limit = 10; 
         
-        // Khởi tạo các biến rỗng để View không bị lỗi undefine variable
         $ingredients = [];
         $suppliers = [];
-        $history_list = []; // Thêm biến cho tab lịch sử
+        $history_list = []; 
         $maxPage_ing = 0;
         $maxPage_sup = 0;
-        $maxPage_hist = 0; // Thêm biến cho tab lịch sử
+        $maxPage_hist = 0; 
         
-        // CÁC BIẾN DÀNH CHO TAB DASHBOARD
         $kpis = [];
         $alerts = [];
         $activities = [];
         
-        // 2. CHỈ XỬ LÝ PHÂN TRANG / TRUY VẤN KHI ĐANG Ở TAB TƯƠNG ỨNG
         if ($active_tab == 'dashboard') {
             
-            // Gọi hàm lấy dữ liệu cho trang Tổng quan kho
             $kpis = $this->stockModel->getDashboardKPIs();
             $alerts = $this->stockModel->getLowStockAlerts(5); 
             
@@ -69,43 +75,41 @@ class StockController {
             $suppliers = $this->stockModel->getSuppliers($search, $status_filter, $limit, $offset_sup);
             
         } elseif ($active_tab == 'history') {
-            // Lấy các tham số tìm kiếm hiện tại
             $search_hist = isset($_GET['search_hist']) ? trim($_GET['search_hist']) : '';
             $type_hist   = isset($_GET['type_hist']) ? trim($_GET['type_hist']) : '';
-            // Bắt thêm tham số lọc ngày
             $date_filter = isset($_GET['date_filter']) ? trim($_GET['date_filter']) : '';
 
             $page_hist = isset($_GET['page_hist']) ? (int)$_GET['page_hist'] : 1;
             $limit_hist = 10;
             $offset_hist = ($page_hist - 1) * $limit_hist;
 
-            // Truyền $date_filter vào model
             $total_hist = $this->stockModel->countReceiptHistory($search_hist, $type_hist, $date_filter);
             $maxPage_hist = ceil($total_hist / $limit_hist);
             $history_list = $this->stockModel->getReceiptHistory($search_hist, $type_hist, $limit_hist, $offset_hist, $date_filter);
+        } elseif ($active_tab == 'cash_shift') {
+            
+        } elseif ($active_tab == 'report') {
+            $startDate = $_GET['start_date'] ?? date('Y-m-01 00:00:00');
+            $endDate = $_GET['end_date'] ?? date('Y-m-t 23:59:59');
+            $reportData = $this->stockModel->getInventoryAndProfitReport($startDate, $endDate);
         }
         
-        // Gọi View để hiển thị
         require_once __DIR__ . '/../views/stock/index.php';
     }
 
-    // ========================================================
-    // CHỨC NĂNG MỚI: TẠO PHIẾU NHẬP / XUẤT KHO
-    // ========================================================
     public function create_receipt() {
-        $type = isset($_GET['type']) ? $_GET['type'] : 'import'; // export hoặc import
+        $this->checkAccess(['ADMIN', 'STOCK']);
+        $type = isset($_GET['type']) ? $_GET['type'] : 'import'; 
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // Chuẩn bị dữ liệu chung của phiếu
             $receiptData = [
                 'receipt_code' => trim($_POST['receipt_code']),
-                'user_id'      => 1, // Fix cứng user_id tạm thời (Nếu có hệ thống login thì lấy từ Session)
+                'user_id'      => 1,
                 'total_amount' => isset($_POST['total_amount']) ? (float)$_POST['total_amount'] : 0,
                 'note'         => trim($_POST['note']),
                 'created_at'   => date('Y-m-d H:i:s')
             ];
 
-            // Lấy chi tiết hàng hóa (mảng ingredient_id, quantity, unit_cost)
             $detailsData = [];
             if (isset($_POST['ingredients']) && is_array($_POST['ingredients'])) {
                 foreach ($_POST['ingredients'] as $id => $detail) {
@@ -124,18 +128,15 @@ class StockController {
                 exit;
             }
 
-            // Phân nhánh lưu Phiếu Nhập hoặc Phiếu Xuất
             if ($type == 'import') {
                 $receiptData['supplier_id'] = !empty($_POST['supplier_id']) ? $_POST['supplier_id'] : null;
                 $result = $this->stockModel->createImportReceipt($receiptData, $detailsData);
                 $msg = 'Nhập kho';
             } else {
-                // Phiếu xuất không cần nhà cung cấp
                 $result = $this->stockModel->createExportReceipt($receiptData, $detailsData);
                 $msg = 'Xuất kho';
             }
 
-            // Thông báo kết quả
             if ($result) {
                 echo "<script>alert('✅ Tạo phiếu $msg thành công!'); window.location.href='index.php?c=stock&a=index&tab=history';</script>";
             } else {
@@ -144,20 +145,17 @@ class StockController {
             exit;
         }
 
-        // Nếu là GET: Đổ dữ liệu cần thiết ra Form
-        $ingredients = $this->stockModel->getIngredients('', '', '', '', 1000, 0); // Lấy tất cả nguyên liệu cho Dropdown chọn
+        $ingredients = $this->stockModel->getIngredients('', '', '', '', 1000, 0); 
         if ($type == 'import') {
             $suppliers = $this->stockModel->getSuppliers('', 'active', 1000, 0);
             require_once __DIR__ . '/../views/stock/stock_receipt/import_form.php';
         } else {
-            // Cần tạo 1 file view export_form.php cho giao diện xuất
             require_once __DIR__ . '/../views/stock/stock_receipt/export_form.php'; 
         }
     }
 
-
-    // XỬ LÝ FORM THÊM / SỬA NGUYÊN LIỆU
     public function form_ingredient() {
+        $this->checkAccess(['ADMIN', 'STOCK']);
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         $ingredient = null;
         
@@ -194,8 +192,8 @@ class StockController {
         require_once __DIR__ . '/../views/stock/form_ingredient.php';
     }
 
-    // XỬ LÝ NÚT XÓA BÊN NGOÀI BẢNG NGUYÊN LIỆU
     public function delete_ingredient() {
+        $this->checkAccess(['ADMIN']);
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($id > 0) {
             $result = $this->stockModel->deleteIngredient($id);
@@ -208,8 +206,8 @@ class StockController {
         echo "<script>window.location.href='index.php?c=stock&a=index&tab=ingredients';</script>";
     }
 
-    // XUẤT EXCEL DANH SÁCH NGUYÊN VẬT LIỆU
     public function export_excel() {
+        $this->checkAccess(['ADMIN', 'STOCK', 'CHEF']);
         $search = isset($_GET['search']) ? trim($_GET['search']) : '';
         $group_filter = isset($_GET['group_filter']) ? trim($_GET['group_filter']) : '';
         $unit_filter = isset($_GET['unit_filter']) ? trim($_GET['unit_filter']) : '';
@@ -251,8 +249,8 @@ class StockController {
         exit; 
     }
 
-    // XỬ LÝ FORM THÊM / SỬA NHÀ CUNG CẤP
     public function form_supplier() {
+        $this->checkAccess(['ADMIN', 'STOCK']);
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         $supplier = null;
         if ($id > 0) {
@@ -286,8 +284,8 @@ class StockController {
         require_once __DIR__ . '/../views/stock/form_supplier.php';
     }
 
-    // ĐÃ BỔ SUNG HÀM XÓA NHÀ CUNG CẤP VÀO ĐÂY
     public function delete_supplier() {
+        $this->checkAccess(['ADMIN']);
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         
         if ($id > 0) {
@@ -303,8 +301,8 @@ class StockController {
         exit;
     }
 
-    // XUẤT EXCEL DANH SÁCH NHÀ CUNG CẤP
     public function export_suppliers_excel() {
+        $this->checkAccess(['ADMIN', 'STOCK']);
         $search = isset($_GET['search']) ? trim($_GET['search']) : '';
         $status_filter = isset($_GET['status_filter']) ? trim($_GET['status_filter']) : '';
         

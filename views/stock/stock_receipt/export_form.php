@@ -7,7 +7,6 @@
         --charcoal: #1a1d20;
     }
     
-    /* Bao bọc trang để cách ly CSS */
     .export-page-wrapper {
         background-color: #f8f9fa;
         min-height: 100vh;
@@ -15,7 +14,6 @@
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     }
 
-    /* Layout tùy chỉnh không phụ thuộc Bootstrap */
     .lux-header-top {
         display: flex;
         justify-content: space-between;
@@ -43,7 +41,6 @@
         box-sizing: border-box;
     }
 
-    /* Card Style */
     .lux-card {
         background: #ffffff;
         border-radius: 8px;
@@ -64,7 +61,6 @@
         align-items: center;
     }
 
-    /* Form Inputs */
     .form-group-lux {
         margin-bottom: 16px;
     }
@@ -93,7 +89,6 @@
         color: #6c757d;
     }
 
-    /* Bảng nguyên liệu */
     .table-responsive-lux {
         width: 100%;
         overflow-x: auto;
@@ -123,7 +118,6 @@
         background-color: #f8f9fa;
     }
 
-    /* === NÚT QUAY LẠI MỚI === */
     .btn-quay-lai {
         display: inline-block;
         padding: 6px 16px;
@@ -142,7 +136,6 @@
         color: var(--gold-dark);
     }
 
-    /* Nút Xác nhận */
     .btn-lux-submit {
         background-color: var(--charcoal);
         color: var(--gold-primary);
@@ -158,7 +151,6 @@
         background-color: #2c3238;
     }
 
-    /* === THANH PHÂN TRANG MỚI === */
     .lux-pagination-wrapper {
         display: flex;
         justify-content: space-between;
@@ -205,7 +197,6 @@
         background-color: #f1f3f5;
     }
 
-    /* Footer Xác nhận */
     .lux-footer {
         display: flex;
         justify-content: space-between;
@@ -217,7 +208,6 @@
 </style>
 
 <div class="export-page-wrapper">
-    <!-- HEADER -->
     <div class="lux-header-top">
         <div>
             <h3 style="margin: 0; font-weight: bold; color: #212529; font-size: 1.5rem; letter-spacing: 0.5px;">LẬP PHIẾU XUẤT KHO</h3>
@@ -230,7 +220,6 @@
 
     <form action="index.php?c=stock_receipt&a=create&type=export" method="POST" id="exportForm">
         
-        <!-- KHỐI 1: THÔNG TIN CHỨNG TỪ -->
         <div class="lux-card">
             <div class="card-header-lux">
                 <span>1. THÔNG TIN CHỨNG TỪ</span>
@@ -272,7 +261,6 @@
             </div>
         </div>
 
-        <!-- KHỐI 2: CHI TIẾT HÀNG HÓA -->
         <div class="lux-card">
             <div class="card-header-lux">
                 <span>2. CHI TIẾT HÀNG HÓA</span>
@@ -326,17 +314,14 @@
                 </table>
             </div>
 
-            <!-- PHÂN TRANG -->
             <div class="lux-pagination-wrapper">
                 <span style="font-size: 0.85rem; color: #6c757d;">
                     * Tổng số mặt hàng trong kho: <strong style="color: #212529;"><?= count($ingredients ?? []) ?></strong>
                 </span>
                 <ul class="lux-pagination" id="paginationControls">
-                    <!-- Javascript render -->
                 </ul>
             </div>
 
-            <!-- FOOTER XÁC NHẬN -->
             <div class="lux-footer">
                 <div style="font-size: 0.85rem; color: #6c757d; font-style: italic;">
                     Lưu ý: Dữ liệu được tích chọn ở các trang khác nhau vẫn sẽ được lưu trữ đầy đủ.
@@ -354,7 +339,6 @@
         const checkboxes = document.querySelectorAll('.item-checkbox');
         const exportForm = document.getElementById('exportForm');
 
-        // TÍCH CHỌN DÒNG
         checkboxes.forEach(chk => {
             chk.addEventListener('change', function () {
                 const row = this.closest('tr');
@@ -374,7 +358,6 @@
             });
         });
 
-        // PHÂN TRANG 10 DÒNG
         const rowsPerPage = 10;
         const tableBody = document.getElementById('ingredientTableBody');
         const tableRows = Array.from(tableBody.querySelectorAll('tr.ing-row'));
@@ -420,7 +403,6 @@
                 paginationControls.appendChild(li);
             }
 
-            // Nút "Sau"
             const nextLi = document.createElement('li');
             nextLi.className = page === totalPages ? 'disabled' : '';
             nextLi.innerHTML = `<a href="#">Sau</a>`;
@@ -432,7 +414,6 @@
 
         if (tableRows.length > 0) displayPage(1);
 
-        // SUBMIT FORM
         exportForm.addEventListener('submit', function (e) {
             const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
             if (checkedBoxes.length === 0) {

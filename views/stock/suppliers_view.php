@@ -1,17 +1,13 @@
-<!-- ================= NHÀ CUNG CẤP ================= -->
 <div class="lux-card p-3 mb-4 d-flex justify-content-between align-items-center">
-    <!-- Form Lọc Nhà Cung Cấp -->
     <form method="GET" action="index.php" class="d-flex gap-2 w-75">
         <input type="hidden" name="c" value="stock">
         <input type="hidden" name="a" value="index">
         <input type="hidden" name="tab" value="suppliers">
         
-        <!-- Tìm kiếm theo Tên hoặc Số điện thoại -->
         <input class="form-control form-control-sm rounded-3 w-50" type="search" name="search" 
                placeholder="Tìm theo Tên hoặc Số điện thoại NCC..." 
                value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
         
-        <!-- Lọc trạng thái -->
         <select class="form-select form-select-sm rounded-3 w-25" name="status_filter">
             <option value="">- Tất cả trạng thái -</option>
             <option value="active" <?= (($_GET['status_filter'] ?? '') === 'active') ? 'selected' : '' ?>>Đang hợp tác</option>
@@ -35,7 +31,6 @@
     </div>
 </div>
 
-<!-- BẢNG DỮ LIỆU NHÀ CUNG CẤP -->
 <div class="lux-card mb-4">
     <div class="table-responsive m-0">
         <table class="table lux-table align-middle mb-0">
@@ -55,9 +50,8 @@
                 <?php if(empty($suppliers)): ?>
                     <tr><td colspan="8" class="text-center py-5 text-muted fw-bold">📭 Chưa có dữ liệu nhà cung cấp.</td></tr>
                 <?php else: 
-                    // Tính STT dựa trên trang hiện tại
                     $page_sup = isset($_GET['page_sup']) ? (int)$_GET['page_sup'] : 1;
-                    $stt = ($page_sup - 1) * 10 + 1; // 10 là số limit dòng trên trang
+                    $stt = ($page_sup - 1) * 10 + 1; 
                     foreach ($suppliers as $sup): 
                 ?>
                 <tr>
@@ -67,7 +61,6 @@
                     <td class="text-center fw-semibold"><?= htmlspecialchars($sup['phone'] ?? '---') ?></td>
                     <td><span class="text-truncate d-inline-block" style="max-width: 250px;" title="<?= htmlspecialchars($sup['address'] ?? '') ?>"><?= htmlspecialchars($sup['address'] ?? '---') ?></span></td>
                     
-                    <!-- Cột Công Nợ in đậm đỏ nếu có nợ, xanh nếu đã thanh toán -->
                     <td class="text-end fw-bold <?= $sup['debt_balance'] > 0 ? 'text-danger' : 'text-success' ?>">
                         <?= number_format($sup['debt_balance'], 0, ',', '.') ?> đ
                     </td>
@@ -80,14 +73,35 @@
                         <?php endif; ?>
                     </td>
                     
-                    <!-- Icon thao tác -->
-                    <td class="text-center pe-4 d-flex justify-content-center gap-1">
-                        <a href="index.php?c=stock&a=form_supplier&id=<?= $sup['id'] ?>" class="btn-icon btn-edit" title="Sửa">
-                            <svg class="icon-action" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <td class="text-center pe-4 d-flex justify-content-center gap-2">
+    
+                        <a href="index.php?c=stock&a=form_supplier&id=<?= (int)$sup['id'] ?>" 
+                        class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" 
+                        style="width: 34px; height: 34px; border: 1px solid #dee2e6; color: #6c757d; background-color: #fff; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#c9a050'; this.style.borderColor='#c9a050'; this.style.color='#fff';" 
+                        onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#dee2e6'; this.style.color='#6c757d';"
+                        title="Sửa">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
                         </a>
-                        <button class="btn-icon btn-delete" title="Xóa" onclick="confirmDeleteSupplier(<?= $sup['id'] ?>, '<?= htmlspecialchars($sup['name'], ENT_QUOTES) ?>')">
-                            <svg class="icon-action" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
-                        </button>
+
+                        <?php if ($role === 'ADMIN'): ?>
+                            <a href="index.php?c=stock&a=delete_supplier&id=<?= (int)$sup['id'] ?>" 
+                            class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" 
+                            style="width: 34px; height: 34px; border: 1px solid #dee2e6; color: #6c757d; background-color: #fff; transition: all 0.2s; text-decoration: none;"
+                            onmouseover="this.style.backgroundColor='#dc3545'; this.style.borderColor='#dc3545'; this.style.color='#fff';" 
+                            onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#dee2e6'; this.style.color='#6c757d';"
+                            onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này?');"
+                            title="Xóa">
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                                </svg>
+                            </a>
+                        <?php endif; ?>
+
                     </td>
                 </tr>
                 <?php endforeach; endif; ?>
@@ -95,7 +109,6 @@
         </table>
     </div>
     
-    <!-- PHÂN TRANG -->
     <?php if(!empty($suppliers) && isset($maxPage_sup) && $maxPage_sup > 1): 
         $queryParams = $_GET;
         unset($queryParams['page_sup']);

@@ -63,7 +63,6 @@
 <body>
 
 <div class="container-fluid py-4 px-4" style="max-width: 1400px;">
-    <!-- Tiêu đề trang -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3 class="fw-bold text-uppercase mb-1">LẬP PHIẾU KIỂM KÊ KHO</h3>
@@ -84,7 +83,6 @@
 
     <form method="POST" action="index.php?c=stock_receipt&a=audit" id="auditForm">
         
-        <!-- ================= 1. THÔNG TIN CHỨNG TỪ ================= -->
         <div class="section-header">1. THÔNG TIN CHỨNG TỪ</div>
         <div class="section-body shadow-sm">
             <div class="row mb-3">
@@ -105,7 +103,6 @@
             </div>
         </div>
 
-        <!-- ================= 2. CHI TIẾT HÀNG HÓA ================= -->
         <div class="section-header d-flex justify-content-between align-items-center">
             <span>2. BẢNG KIỂM ĐẾM HÀNG HÓA</span>
             <span class="badge bg-warning text-dark">Lưu ý: Điền số lượng thực tế & lý do nếu có chênh lệch</span>
@@ -146,7 +143,6 @@
                             
                             <td class="text-center diff-col fw-bold bg-light"><span class="text-muted">-</span></td>
                             
-                            <!-- CỘT LÝ DO MỚI THÊM -->
                             <td class="p-2">
                                 <input type="text" class="form-control form-control-sm" name="reason[]" placeholder="Nhập lý do lệch (nếu có)...">
                             </td>
@@ -156,7 +152,6 @@
                 </table>
             </div>
 
-            <!-- THANH PHÂN TRANG -->
             <div class="d-flex justify-content-between align-items-center p-3 bg-light border-top">
                 <span class="text-muted small fw-bold" id="pageInfo">Đang tải...</span>
                 <nav>
@@ -166,7 +161,6 @@
             </div>
         </div>
 
-        <!-- ================= NÚT XÁC NHẬN ================= -->
         <div class="d-flex justify-content-end mb-5 mt-4">
             <button type="submit" class="btn btn-gold-submit px-5 py-3 rounded-3 d-flex align-items-center gap-2 fs-5 shadow">
                 💾 XÁC NHẬN KIỂM KÊ KHO
@@ -211,7 +205,6 @@ document.addEventListener("DOMContentLoaded", function() {
     else document.getElementById('pageInfo').innerText = "Không có dữ liệu nguyên vật liệu.";
 });
 
-// Tính lệch tự động
 document.querySelectorAll('.actual-input').forEach(input => {
     input.addEventListener('input', function() {
         let currentQty = parseFloat(this.getAttribute('data-current'));
@@ -229,7 +222,6 @@ document.querySelectorAll('.actual-input').forEach(input => {
     });
 });
 
-// Xuất Excel
 function exportToExcel() {
     var wb = XLSX.utils.book_new();
     var ws_data = [
