@@ -24,15 +24,19 @@
             <h3 class="fw-bold m-0 text-gold">🌟 RoyalDine 5S - Bán Hàng POS & Điều Phối Bếp KDS</h3>
             <small class="text-muted">Phân hệ TV3: Quản lý Order, KDS Điều phối bếp và Thanh toán chuẩn 5 sao</small>
         </div>
-        <!-- Thanh chuyển Tab POS / KDS -->
-        <ul class="nav nav-pills bg-dark p-1 border border-secondary rounded-3" id="posTab" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link active" id="pos-tab" data-bs-toggle="tab" data-bs-target="#pos-panel">💻 Gọi Món (POS)</button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link" id="kds-tab" data-bs-toggle="tab" data-bs-target="#kds-panel" onclick="loadKDS()">👨‍🍳 Bếp (KDS) <span class="badge bg-danger ms-1" id="kdsCount">0</span></button>
-            </li>
-        </ul>
+        
+        <!-- Nút Báo Cáo và Thanh chuyển Tab POS / KDS -->
+        <div class="d-flex gap-2 align-items-center">
+            <a href="index.php?c=pos&a=report" class="btn btn-outline-info btn-sm">📊 Xem Báo Cáo</a>
+            <ul class="nav nav-pills bg-dark p-1 border border-secondary rounded-3" id="posTab" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="pos-tab" data-bs-toggle="tab" data-bs-target="#pos-panel">💻 Gọi Món (POS)</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="kds-tab" data-bs-toggle="tab" data-bs-target="#kds-panel" onclick="loadKDS()">👨‍🍳 Bếp (KDS) <span class="badge bg-danger ms-1" id="kdsCount">0</span></button>
+                </li>
+            </ul>
+        </div>
     </div>
 
     <div class="tab-content" id="posTabContent">
@@ -148,10 +152,10 @@
                             </div>
 
                             <div class="d-grid gap-2">
-                            <button onclick="submitOrder()" class="btn btn-gold py-2">🔥 Gửi Order Cho Bếp (KDS)</button>
-                            <button onclick="checkoutAction()" class="btn btn-outline-success py-2">💳 Thanh Toán (Checkout VietQR)</button>
-                            <button onclick="printBillAction()" class="btn btn-outline-info py-2">🖨️ In Hóa Đơn (HTML/PDF)</button>
-                        </div>
+                                <button onclick="submitOrder()" class="btn btn-gold py-2">🔥 Gửi Order Cho Bếp (KDS)</button>
+                                <button onclick="checkoutAction()" class="btn btn-outline-success py-2">💳 Thanh Toán (Checkout VietQR)</button>
+                                <button onclick="printBillAction()" class="btn btn-outline-info py-2">🖨️ In Hóa Đơn (HTML/PDF)</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -342,14 +346,13 @@ function cancelItemAction(orderDetailId) {
         if(res.status === 'success') loadKDS();
     });
 }
-// Hàm in hóa đơn trực tiếp bằng cách nhập ID Đơn hàng
+
 function printBillAction() {
     const orderId = prompt("Nhập ID Đơn hàng cần in hóa đơn (Xem ID Đơn tại tab Bếp KDS):");
     if (!orderId) return;
     window.open(`index.php?c=pos&a=printBill&order_id=${orderId}`, '_blank', 'width=450,height=700');
 }
 
-// Cập nhật hàm Thanh toán -> Tự động mở Bill in sau khi thanh toán xong
 function checkoutAction() {
     const orderId = prompt("Nhập ID Đơn hàng cần thanh toán (Xem tại tab Bếp KDS):");
     if (!orderId) return;

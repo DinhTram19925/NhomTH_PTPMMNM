@@ -12,6 +12,11 @@ class PosController {
         require_once __DIR__ . '/../views/pos/index.php';
     }
 
+// Hiển thị giao diện báo cáo
+    public function report() {
+        require_once __DIR__ . '/../views/pos/report.php';
+    } 
+
     public function createOrder() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -86,5 +91,20 @@ class PosController {
         $order = $billData['order'];
         $details = $billData['details'];
         require_once __DIR__ . '/../views/pos/print_bill.php';
+    }
+
+    // API trả về toàn bộ dữ liệu báo cáo 
+    public function getReportData() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $data = [
+            'payment_methods' => $this->orderModel->getReportByPaymentMethod(),
+            'cancel_logs'     => $this->orderModel->getCancelLogsReport(),
+            'shifts'          => $this->orderModel->getShiftRevenueReport()
+        ];
+
+        echo json_encode($data);
+        exit;
     }
 }

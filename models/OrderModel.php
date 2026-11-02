@@ -234,5 +234,35 @@ class OrderModel {
             'details' => $details
         ];
     }
+
+    // 8. Báo cáo doanh thu theo phương thức thanh toán
+    public function getReportByPaymentMethod() {
+        $sql = "SELECT payment_method, 
+                       COUNT(id) AS transaction_count, 
+                       IFNULL(SUM(amount), 0) AS total_revenue 
+                FROM payments 
+                GROUP BY payment_method";
+        return $this->db->query($sql)->fetchAll();
+    }
+
+    // 9. Báo cáo nhật ký Hủy Món (Giám sát chống gian lận)
+    public function getCancelLogsReport() {
+        $sql = "SELECT ol.id, ol.order_id, u.full_name AS staff_name, ol.description, ol.created_at 
+                FROM order_logs ol 
+                LEFT JOIN users u ON ol.user_id = u.id 
+                WHERE ol.action_type = 'CancelItem' 
+                ORDER BY ol.id DESC";
+        return $this->db->query($sql)->fetchAll();
+    }
+
+    // 10. Báo cáo doanh thu theo ca thu ngân (Cash Shifts)
+    public function getShiftRevenueReport() {
+        $sql = "SELECT cs.id AS shift_id, u.full_name AS cashier_name, cs.opened_at, cs.closed_at, 
+                       cs.opening_cash, cs.total_cash_sales, cs.status
+                FROM cash_shifts cs
+                JOIN users u ON cs.cashier_id = u.id
+                ORDER BY cs.id DESC";
+        return $this->db->query($sql)->fetchAll();
+    }
    
 }
