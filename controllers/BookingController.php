@@ -27,7 +27,7 @@ public function index()
     // QUẢN LÝ BÀN
     public function manage()
 {
-    $this->requireRole(['ADMIN']);
+    $this->requireRole(['ADMIN','WAITER']);
 
     $model = new TableModel();
     $error = '';
@@ -152,7 +152,7 @@ public function index()
     // ĐẶT BÀN VIP
     public function vip()
     {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
+        $this->requireRole(['ADMIN', 'HOSTESS','WAITER', 'CASHIER']);
 
         $model = new ReservationModel();
         $error = '';
@@ -301,7 +301,7 @@ public function index()
     // BAO CAO BOOKING VA CRM
     public function report(): void
     {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
+        $this->requireRole(['ADMIN', 'HOSTESS','WAITER', 'CASHIER']);
 
         $model = new ReservationModel();
 

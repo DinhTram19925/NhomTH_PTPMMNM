@@ -14,7 +14,7 @@ class CustomerController extends Controller
 
     public function index()
     {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
+        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER']);
 
         $keyword = trim($_GET['keyword'] ?? '');
         $customers = $this->customerModel->getAllCustomers($keyword);
