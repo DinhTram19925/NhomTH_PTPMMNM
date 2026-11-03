@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/CustomerModel.php';
 require_once __DIR__ . '/../config/Database.php';
 
 class OrderModel {
@@ -18,8 +19,39 @@ class OrderModel {
 
             if (!$order) {
                 $order_code = 'ORD-' . strtoupper(uniqid());
-                $stmtInsert = $this->db->prepare("INSERT INTO orders (order_code, table_id, waiter_id, status, opened_at) VALUES (?, ?, ?, 'Open', NOW())");
-                $stmtInsert->execute([$order_code, $table_id, $waiter_id]);
+                // Tìm phiếu đặt bàn đã check-in để liên kết khách hàng với đơn hàng.
+$reservationStmt = $this->db->prepare(
+    "SELECT id, customer_id
+     FROM reservations
+     WHERE table_id = ?
+       AND status = 'CheckedIn'
+     ORDER BY id DESC
+     LIMIT 1"
+);
+$reservationStmt->execute([$table_id]);
+$reservation = $reservationStmt->fetch(PDO::FETCH_ASSOC);
+
+$reservationId = $reservation['id'] ?? null;
+$customerId = $reservation['customer_id'] ?? null;
+
+$order_code = 'ORD-' . strtoupper(uniqid());
+
+$stmtInsert = $this->db->prepare(
+    "INSERT INTO orders
+        (order_code, table_id, waiter_id, reservation_id, customer_id,
+         status, opened_at)
+     VALUES (?, ?, ?, ?, ?, 'Open', NOW())"
+);
+
+$stmtInsert->execute([
+    $order_code,
+    $table_id,
+    $waiter_id,
+    $reservationId,
+    $customerId
+]);
+
+
                 $order_id = $this->db->lastInsertId();
 
                 $this->db->prepare("UPDATE dining_tables SET status = 'Occupied' WHERE id = ?")->execute([$table_id]);
@@ -106,16 +138,22 @@ class OrderModel {
     public function checkoutOrder($order_id, $cashier_id, $payment_method, $discount_amount = 0) {
         $this->db->beginTransaction();
         try {
-            $sql = "SELECT o.*, a.surcharge_percent, r.deposit_amount 
-                    FROM orders o
-                    JOIN dining_tables dt ON o.table_id = dt.id
-                    JOIN areas a ON dt.area_id = a.id
-                    LEFT JOIN reservations r ON o.reservation_id = r.id
-                    WHERE o.id = ?";
+           $sql = "SELECT o.*,
+               a.surcharge_percent,
+               r.deposit_amount,
+               COALESCE(o.customer_id, r.customer_id) AS crm_customer_id
+        FROM orders o
+        JOIN dining_tables dt ON o.table_id = dt.id
+        JOIN areas a ON dt.area_id = a.id
+        LEFT JOIN reservations r ON o.reservation_id = r.id
+        WHERE o.id = ?
+        FOR UPDATE";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$order_id]);
             $order = $stmt->fetch();
-
+            if (!$order) {
+    throw new Exception("Không tìm thấy đơn hàng.");
+}
             if (!$order) {
             throw new Exception("Không tìm thấy đơn hàng!");
             }
@@ -124,9 +162,10 @@ class OrderModel {
                 throw new Exception("Đơn hàng đã được thanh toán trước đó.");
             }
 
-            $subtotal = (float)$order['subtotal'];
-            $area_surcharge_percent = (float)($order['surcharge_percent'] ?? 0);
-            $deposit_deducted = (float)($order['deposit_amount'] ?? 0);
+           $subtotal = $order['subtotal'];
+            $area_surcharge_percent = $order['surcharge_percent'] ?? 0;
+            $deposit_deducted = $order['deposit_amount'] ?? 0;
+
 
             $area_surcharge_amount = $subtotal * ($area_surcharge_percent / 100);
             $service_charge_amount = ($subtotal + $area_surcharge_amount) * 0.05;
@@ -142,7 +181,16 @@ class OrderModel {
 
             $stmtPay = $this->db->prepare("INSERT INTO payments (order_id, cashier_id, payment_method, amount) VALUES (?, ?, ?, ?)");
             $stmtPay->execute([$order_id, $cashier_id, $payment_method, $total_amount]);
+if (!empty($order['crm_customer_id'])) {
+    $customerModel = new CustomerModel();
 
+    $loyaltyAmount = max(0, $taxable_amount + $vat_amount);
+
+    $customerModel->recordPurchase(
+        (int)$order['crm_customer_id'],
+        $loyaltyAmount
+    );
+}
             $this->db->prepare("UPDATE dining_tables SET status = 'Available' WHERE id = ?")->execute([$order['table_id']]);
 
             $this->db->prepare("INSERT INTO order_logs (order_id, user_id, action_type, description) VALUES (?, ?, 'Checkout', ?)")

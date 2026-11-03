@@ -5,7 +5,10 @@ class PosController {
     private $orderModel;
 
     public function __construct() {
-        $this->orderModel = new OrderModel();
+
+        
+        $this->orderModel = new OrderModel(); 
+
     }
 
     public function index() {
