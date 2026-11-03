@@ -14,7 +14,7 @@ class CustomerController extends Controller
 
     public function index()
     {
-        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER']);
+        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER', 'CASHIER']);
 
         $keyword = trim($_GET['keyword'] ?? '');
         $customers = $this->customerModel->getAllCustomers($keyword);
@@ -34,7 +34,7 @@ class CustomerController extends Controller
 
     public function create()
     {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
+        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER', 'CASHIER']);
 
         $error = '';
         $customer = null;
@@ -54,7 +54,7 @@ class CustomerController extends Controller
 
     public function edit()
     {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
+        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER', 'CASHIER']);
 
         $id = (int)($_GET['id'] ?? 0);
         $customer = $this->customerModel->findCustomer($id);
@@ -81,7 +81,7 @@ class CustomerController extends Controller
 
     public function detail()
     {
-        $this->requireRole(['ADMIN', 'HOSTESS']);
+        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER', 'CASHIER']);
 
         $id = (int)($_GET['id'] ?? 0);
         $customer = $this->customerModel->findCustomer($id);
