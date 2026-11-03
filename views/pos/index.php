@@ -1,10 +1,4 @@
 <?php
-/**
- * views/pos/index.php - Giao diện RoyalDine 5S cho BACKEND GỐC (PosController + OrderModel của bạn, chưa sửa gì).
- * Chỉ dùng các API có sẵn: createOrder, updateKds, cancelItem, transferTable, checkout, printBill.
- * Dữ liệu bàn / thực đơn / đơn đang mở được view tự đọc từ DB và nhúng vào trang (thẻ #rdState),
- * nên không cần thêm endpoint và không cần chạy migration.
- */
 require __DIR__ . '/_style.php';
 require_once __DIR__ . '/../../config/Database.php';
 
