@@ -1,3 +1,21 @@
+<style>
+    .btn-outline-excel {
+        background-color: #ffffff !important;
+        color: #212529 !important; 
+        border: 1px solid #dee2e6 !important;
+        font-weight: 700 !important; 
+        transition: all 0.2s ease !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }
+
+    .btn-outline-excel:hover {
+        background-color: var(--gold-light, #fdf8ee) !important;
+        color: var(--gold-dark, #a8823b) !important;
+        border-color: var(--gold-primary, #c9a050) !important;
+    }
+</style>
+
 <div class="lux-card p-3 mb-4 d-flex justify-content-between align-items-center">
     <form method="GET" action="index.php" class="d-flex gap-2 w-75">
         <input type="hidden" name="c" value="stock">
