@@ -8,7 +8,7 @@ class OrderModel {
         $this->db = Database::getConnection();
     }
 
-    // Tạo đơn & Gọi món
+    // 1. Tạo đơn & Gọi món
     public function createOrAddOrder($table_id, $waiter_id, $items) {
         $this->db->beginTransaction();
         try {
@@ -102,7 +102,7 @@ class OrderModel {
         return $stmt->execute([$new_status, $order_detail_id]);
     }
 
-    // 5. Thanh toán & VietQR (Đã sửa lỗi toán học PHP)
+    // 5. Thanh toán & VietQR (Đã sửa lỗi toán học)
     public function checkoutOrder($order_id, $cashier_id, $payment_method, $discount_amount = 0) {
         $this->db->beginTransaction();
         try {
@@ -116,12 +116,19 @@ class OrderModel {
             $stmt->execute([$order_id]);
             $order = $stmt->fetch();
 
-            if (!$order) throw new Exception("Không tìm thấy đơn hàng!");
+            if (!$order) {
+                throw new Exception("Không tìm thấy đơn hàng!");
+            }
+
+            if (isset($order['status']) && $order['status'] === 'Paid') {
+                throw new Exception("Đơn hàng đã được thanh toán trước đó.");
+            }
 
             $subtotal = (float)$order['subtotal'];
             $area_surcharge_percent = (float)($order['surcharge_percent'] ?? 0);
             $deposit_deducted = (float)($order['deposit_amount'] ?? 0);
 
+            // Công thức toán học đã chuẩn hóa
             $area_surcharge_amount = $subtotal * ($area_surcharge_percent / 100);
             $service_charge_amount = ($subtotal + $area_surcharge_amount) * 0.05;
             $taxable_amount = $subtotal + $area_surcharge_amount + $service_charge_amount - $discount_amount;
