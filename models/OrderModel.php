@@ -96,13 +96,13 @@ class OrderModel {
         return $this->db->query($sql)->fetchAll();
     }
 
-    // 4. Cập nhật KDS (Waiting -> Cooking -> Ready)
+    // 4. Cập nhật KDS
     public function updateKdsStatus($order_detail_id, $new_status) {
         $stmt = $this->db->prepare("UPDATE order_details SET kds_status = ? WHERE id = ?");
         return $stmt->execute([$new_status, $order_detail_id]);
     }
 
-    // 5. Thanh toán & VietQR (Đã sửa lỗi toán học)
+    // 5. Thanh toán & VietQR
     public function checkoutOrder($order_id, $cashier_id, $payment_method, $discount_amount = 0) {
         $this->db->beginTransaction();
         try {
@@ -117,7 +117,7 @@ class OrderModel {
             $order = $stmt->fetch();
 
             if (!$order) {
-                throw new Exception("Không tìm thấy đơn hàng!");
+            throw new Exception("Không tìm thấy đơn hàng!");
             }
 
             if (isset($order['status']) && $order['status'] === 'Paid') {
@@ -128,7 +128,6 @@ class OrderModel {
             $area_surcharge_percent = (float)($order['surcharge_percent'] ?? 0);
             $deposit_deducted = (float)($order['deposit_amount'] ?? 0);
 
-            // Công thức toán học đã chuẩn hóa
             $area_surcharge_amount = $subtotal * ($area_surcharge_percent / 100);
             $service_charge_amount = ($subtotal + $area_surcharge_amount) * 0.05;
             $taxable_amount = $subtotal + $area_surcharge_amount + $service_charge_amount - $discount_amount;
