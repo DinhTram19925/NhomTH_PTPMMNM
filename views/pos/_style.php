@@ -424,7 +424,9 @@ body {
 }
 
 .rd-tot.big {
-    font: 700 24px "Cormorant Garamond", serif;
+    font-family: "Be Vietnam Pro", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 24px;
     color: var(--g);
     border-top: 1px solid var(--g);
     margin-top: 8px;
@@ -585,7 +587,9 @@ body {
 
 .rd-kpi b {
     display: block;
-    font: 700 28px "Cormorant Garamond", serif;
+    font-family: "Be Vietnam Pro", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 28px;
     color: var(--g);
 }
 
