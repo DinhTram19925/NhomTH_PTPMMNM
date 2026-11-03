@@ -1,9 +1,5 @@
 <?php
-/**
- * views/pos/report.php - Báo cáo cho BACKEND GỐC.
- * Bộ lọc ngày của backend gốc không hoạt động (getReportData bỏ qua from_date/to_date, và truy vấn payments dùng nhầm cột created_at),
- * nên view này tự đọc DB theo khoảng ngày được chọn (GET) và vẽ ngay bằng PHP. Không cần sửa Controller/Model.
- */
+
 require __DIR__ . '/_style.php';
 require_once __DIR__ . '/../../config/Database.php';
 
@@ -47,7 +43,7 @@ try {
                 WHERE ol.action_type = 'CancelItem' AND ol.created_at >= ? AND ol.created_at < DATE_ADD(?, INTERVAL 1 DAY)
                 ORDER BY ol.id DESC", $rg);
 
-    // Log gốc chỉ ghi "Hủy món ID n. Lý do: ..." -> tra tên món theo ID để báo cáo dễ đọc
+    
     $ids = [];
     foreach ($logs as $l) if (preg_match('/Hủy món ID (\d+)/u', $l['description'], $m)) $ids[] = (int)$m[1];
     $names = [];
