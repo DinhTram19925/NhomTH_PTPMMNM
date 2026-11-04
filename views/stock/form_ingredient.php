@@ -61,7 +61,6 @@
                 <select class="form-select fw-semibold" name="unit" required>
                     <option value="">-- Chọn đơn vị --</option>
                     <?php 
-                    // Danh sách các đơn vị tính chuẩn của nhà hàng RoyalDine 5S
                     $units = ['kg', 'g', 'lít', 'ml', 'chai', 'lon', 'hộp', 'thùng', 'bó', 'lá', 'con', 'cái', 'phần'];
                     $currentUnit = $ingredient['unit'] ?? '';
                     foreach($units as $u): 
@@ -87,7 +86,6 @@
                     <option value="">-- Chọn Nhà Cung Cấp --</option>
                     <?php 
                     $currentSupId = $ingredient['supplier_id'] ?? null;
-                    // Kiểm tra xem biến $suppliers có tồn tại hay không để tránh lỗi vòng lặp
                     if (isset($suppliers) && is_array($suppliers)):
                         foreach($suppliers as $sup): 
                     ?>

@@ -16,7 +16,6 @@
         .form-control, .form-select { border-radius: 8px; border: 1px solid #ced4da; padding: 10px 15px; }
         .form-control:focus, .form-select:focus { border-color: #c9a050; box-shadow: 0 0 0 0.2rem rgba(201, 160, 80, 0.25); }
         
-        /* Trạng thái mặc định: Từ trắng (Nền trắng, chữ đen) */
         .btn-back-lux {
             background-color: #ffffff; 
             color: #1a1a1a; 
@@ -25,7 +24,6 @@
             font-weight: 600;
         }
         
-        /* Khi hover: Sang đen (Nền trong suốt lộ màu đen của header, chữ/viền vàng đồng) */
         .btn-back-lux:hover {
             background-color: transparent; 
             color: #d4af37; 
@@ -40,7 +38,6 @@
             <h5 class="mb-0 fw-bold text-uppercase">
                 <?= $id > 0 ? '✏️ CẬP NHẬT NHÀ CUNG CẤP' : '➕ THÊM NHÀ CUNG CẤP MỚI' ?>
             </h5>
-            <!-- Đã đổi class thành btn-back-lux -->
             <a href="index.php?c=stock&a=index&tab=suppliers" class="btn btn-sm btn-back-lux rounded-pill px-3">Quay lại</a>
         </div>
         

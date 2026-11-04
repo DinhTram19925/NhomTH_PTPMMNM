@@ -1,7 +1,23 @@
-<!-- ================= NGUYÊN VẬT LIỆU ================= -->
+<style>
+    .btn-outline-excel {
+        background-color: #ffffff !important;
+        color: #212529 !important; /* Đổi sang màu chữ đậm gần như đen để sắc nét hơn */
+        border: 1px solid #dee2e6 !important;
+        font-weight: 700 !important; /* Làm chữ đậm lên rõ rệt */
+        transition: all 0.2s ease !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }
+
+    .btn-outline-excel:hover {
+        background-color: var(--gold-light, #fdf8ee) !important;
+        color: var(--gold-dark, #a8823b) !important;
+        border-color: var(--gold-primary, #c9a050) !important;
+    }
+</style>
+
 <div class="lux-card p-3 mb-4 d-flex justify-content-between align-items-center">
-    <!-- Ràng buộc pattern và Lọc -->
-    <!-- Ràng buộc pattern và Lọc -->
+
     <form method="GET" action="index.php" class="d-flex gap-2 w-75" onsubmit="return validateSearch(this);">
         <input type="hidden" name="c" value="stock">
         <input type="hidden" name="a" value="index">
@@ -11,7 +27,6 @@
                pattern="^[a-zA-Z0-9\sÀ-ỹ-]+$" title="Chỉ nhập chữ, số và dấu gạch ngang" 
                placeholder="Mã hoặc Tên NVL..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
         
-        <!-- Dropdown Nhóm Nguyên Liệu -->
         <select class="form-select form-select-sm rounded-3 w-25" name="group_filter">
             <option value="">- Tất cả nhóm NVL -</option>
             <?php 
@@ -24,7 +39,6 @@
             <?php endforeach; ?>
         </select>
 
-        <!-- Dropdown Đơn Vị Tính -->
         <select class="form-select form-select-sm rounded-3 w-25" name="unit_filter">
             <option value="">- Tất cả đơn vị tính -</option>
             <?php 
@@ -62,7 +76,6 @@
         <div class="d-flex gap-1">
             <button class="btn btn-gold-lux btn-sm rounded-3 px-3" type="submit">Lọc</button>
             
-            <!-- NÚT XÓA LỌC HIỂN THỊ ĐỘNG -->
             <?php if (!empty($_GET['search']) || !empty($_GET['group_filter']) || !empty($_GET['unit_filter']) || !empty($_GET['status_filter'])): ?>
                 <a href="index.php?c=stock&a=index&tab=ingredients" class="btn btn-light btn-sm rounded-3 px-3 border text-muted fw-bold" title="Hủy bỏ bộ lọc">
                     ✕ Hủy
@@ -79,7 +92,6 @@
     </div>
 </div>
 
-<!-- BẢNG DỮ LIỆU -->
 <div class="lux-card mb-4">
     <div class="table-responsive m-0">
         <table class="table lux-table align-middle mb-0">
@@ -103,7 +115,6 @@
                 <?php else: foreach ($ingredients as $item): 
                     $isLowStock = $item['stock_quantity'] <= $item['min_stock_level'];
                     
-                    // Xác định màu sắc (class) dựa trên Tên Nhóm
                     $groupClass = 'badge-default';
                     $groupName = $item['group_name'] ?? 'Chưa phân nhóm';
                     switch ($groupName) {
@@ -119,7 +130,6 @@
                     <td class="ps-4"><span class="badge-code">#<?= htmlspecialchars($item['ingredient_code']) ?></span></td>
                     <td class="item-name"><?= htmlspecialchars($item['name']) ?></td>
                     
-                    <!-- Cột Nhóm được chia màu -->
                     <td class="text-center">
                         <span class="badge <?= $groupClass ?> px-3 py-2 rounded-pill fw-bold shadow-sm" style="font-size: 0.85rem;">
                             <?= htmlspecialchars($groupName) ?>
@@ -128,15 +138,12 @@
                     
                     <td class="text-center fw-semibold text-muted"><?= htmlspecialchars($item['unit']) ?></td>
                     
-                    <!-- Số lượng tồn kho -->
                     <td class="text-end <?= $isLowStock ? 'stock-danger' : 'stock-safe' ?>"><?= number_format($item['stock_quantity'], 2) ?></td>
                     
-                    <!-- Cột Tồn tối thiểu: In đậm và màu xám đậm dễ nhìn -->
                     <td class="text-end fw-bold text-secondary" style="font-size: 1.05rem;">
                         <?= number_format($item['min_stock_level'], 2) ?>
                     </td>
                     
-                    <!-- Giá vốn Vàng Đồng -->
                     <td class="text-end highlight-price"><?= number_format($item['cost_price'], 0, ',', '.') ?> đ</td>
                     <td class="text-muted" style="font-size: 0.85rem;"><?= htmlspecialchars($item['supplier_name'] ?? 'Chưa xác định') ?></td>
                     
@@ -155,14 +162,35 @@
                         <?php endif; ?>
                     </td>
                     
-                    <!-- Icon thao tác -->
-                    <td class="text-center pe-4 d-flex justify-content-center gap-1">
-                        <a href="index.php?c=stock&a=form_ingredient&id=<?= $item['id'] ?>" class="btn-icon btn-edit" title="Sửa">
-                            <svg class="icon-action" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <td class="text-center pe-4 d-flex justify-content-center gap-2">
+    
+                        <a href="index.php?c=stock&a=form_ingredient&id=<?= (int)$item['id'] ?>" 
+                        class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" 
+                        style="width: 34px; height: 34px; border: 1px solid #dee2e6; color: #6c757d; background-color: #fff; transition: all 0.2s; text-decoration: none;"
+                        onmouseover="this.style.backgroundColor='#c9a050'; this.style.borderColor='#c9a050'; this.style.color='#fff';" 
+                        onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#dee2e6'; this.style.color='#6c757d';"
+                        title="Sửa">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
                         </a>
-                        <button class="btn-icon btn-delete" title="Ngừng sử dụng" onclick="confirmDelete(<?= $item['id'] ?>, '<?= htmlspecialchars($item['name'], ENT_QUOTES) ?>')">
-                            <svg class="icon-action" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
-                        </button>
+
+                        <?php if ($role === 'ADMIN'): ?>
+                            <a href="index.php?c=stock&a=delete_ingredient&id=<?= (int)$item['id'] ?>" 
+                            class="btn-action-edit rounded-3 d-flex align-items-center justify-content-center" 
+                            style="width: 34px; height: 34px; border: 1px solid #dee2e6; color: #6c757d; background-color: #fff; transition: all 0.2s; text-decoration: none;"
+                            onmouseover="this.style.backgroundColor='#dc3545'; this.style.borderColor='#dc3545'; this.style.color='#fff';" 
+                            onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#dee2e6'; this.style.color='#6c757d';"
+                            onclick="return confirm('Bạn có chắc muốn xóa nguyên liệu này?');"
+                            title="Xóa">
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                                </svg>
+                            </a>
+                        <?php endif; ?>
+
                     </td>
                 </tr>
                 <?php endforeach; endif; ?>
@@ -170,7 +198,6 @@
         </table>
     </div>
     
-    <!-- PHÂN TRANG (TỰ ĐỘNG THEO PHP) -->
     <?php if(!empty($ingredients) && isset($maxPage_ing) && $maxPage_ing > 1): 
         $page_ing = isset($_GET['page_ing']) ? (int)$_GET['page_ing'] : 1;
         $queryParams = $_GET;
@@ -208,7 +235,7 @@ function confirmDelete(id, name) {
 }
 function exportToExcel() {
     const urlParams = new URLSearchParams(window.location.search);
-    urlParams.set('a', 'export_excel'); // Đổi action thành export_excel
+    urlParams.set('a', 'export_excel'); 
     window.location.href = 'index.php?' + urlParams.toString();
 }
 </script>

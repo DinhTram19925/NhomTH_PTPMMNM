@@ -50,7 +50,6 @@
             box-shadow: 0 0 0 0.2rem rgba(201, 160, 80, 0.2); 
         }
         
-        /* Chặn nhập các phím không hợp lệ (e, E, -, +) vào ô số */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
@@ -72,7 +71,6 @@
         .lux-table tbody tr:hover { background-color: #fdf8ee; }
         .lux-table td { padding: 12px; vertical-align: middle; border-bottom: 1px solid var(--table-border); }
         
-        /* Nút Xác nhận đồng bộ màu Vàng Kim - Đen Than */
         .btn-submit-lux { 
             background: linear-gradient(to right, #1a1d20, #2c3136);
             color: #d4af37; 
@@ -124,10 +122,8 @@
         </button>
     </div>
 
-    <!-- Gọi hàm onSubmit logic kiểm tra chặt chẽ -->
     <form method="POST" action="index.php?c=stock_receipt&a=create&type=import" id="importForm" onsubmit="return validateForm()">
         
-        <!-- THÔNG TIN CHUNG CỦA PHIẾU -->
         <div class="lux-card">
             <div class="card-header-lux">1. Thông tin chứng từ</div>
             <div class="p-4 row g-4">
@@ -150,13 +146,11 @@
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">Ghi chú / Diễn giải</label>
-                    <!-- Giới hạn độ dài ghi chú để tránh lỗi DB -->
                     <input type="text" class="form-control" name="note" maxlength="255" placeholder="Ví dụ: Nhập hàng tươi sống đầu tuần...">
                 </div>
             </div>
         </div>
 
-        <!-- CHI TIẾT NGUYÊN VẬT LIỆU -->
         <div class="lux-card">
             <div class="card-header-lux d-flex justify-content-between align-items-center">
                 <span>2. Chi tiết hàng hóa</span>
@@ -187,7 +181,6 @@
                                 </select>
                             </td>
                             <td class="text-center unit-display fw-bold text-muted">-</td>
-                            <!-- Chặn nhập số âm, ký tự e bằng onkeydown -->
                             <td><input type="number" step="0.01" min="0.01" class="form-control qty-input text-center fw-bold text-primary" name="quantity[]" value="1" oninput="calcRow(this)" onkeydown="return event.keyCode !== 69 && event.keyCode !== 189" required></td>
                             <td><input type="number" step="1" min="0" class="form-control price-input text-end fw-bold" name="unit_cost[]" value="0" oninput="calcRow(this)" onkeydown="return event.keyCode !== 69 && event.keyCode !== 189" required></td>
                             <td class="text-end row-total">0</td>
@@ -205,7 +198,6 @@
             </div>
         </div>
 
-        <!-- NÚT XÁC NHẬN (Đen Than + Vàng Kim) -->
         <div class="text-end mb-5">
             <button type="submit" id="btnSubmit" class="btn btn-submit-lux px-5 py-3 fs-6">
                 💾 XÁC NHẬN NHẬP KHO
@@ -264,7 +256,6 @@
 
     function calcRow(elem) {
         const tr = elem.closest('tr');
-        // Ràng buộc cứng: Nếu số lượng/đơn giá nhập vào < 0 thì ép về 0
         let qty = parseFloat(tr.querySelector('.qty-input').value);
         let price = parseFloat(tr.querySelector('.price-input').value);
         
@@ -289,18 +280,15 @@
         document.getElementById('grandTotal').textContent = grandTotal.toLocaleString('vi-VN');
     }
 
-    // HÀM KIỂM TRA CHẶT CHẼ TRƯỚC KHI GỬI DỮ LIỆU
     function validateForm() {
         const tbody = document.querySelector('#detailTable tbody');
         const rows = tbody.querySelectorAll('tr');
         
-        // 1. Kiểm tra xem có dòng dữ liệu nào không
         if(rows.length === 0) {
             alert("Vui lòng thêm ít nhất một loại nguyên liệu để nhập kho!");
             return false;
         }
 
-        // 2. Kiểm tra từng dòng
         for (let i = 0; i < rows.length; i++) {
             const select = rows[i].querySelector('.ingredient-select');
             const qty = parseFloat(rows[i].querySelector('.qty-input').value);
@@ -317,7 +305,6 @@
             }
         }
 
-        // 3. Khóa nút submit để chống double-click (Chống Tester spam click)
         const btn = document.getElementById('btnSubmit');
         btn.disabled = true;
         btn.innerHTML = '⏳ ĐANG XỬ LÝ...';

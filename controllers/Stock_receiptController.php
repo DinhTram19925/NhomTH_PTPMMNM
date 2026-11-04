@@ -8,24 +8,35 @@ class Stock_receiptController {
         $this->stockModel = new StockModel();
     }
 
+    private function checkAccess($allowedRoles) {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $currentRole = $_SESSION['user']['role_code'] ?? '';
+        
+        if ($currentRole === 'ADMIN') return true;
+        if (!in_array($currentRole, $allowedRoles)) {
+            echo "<script>alert('❌ BẠN KHÔNG CÓ QUYỀN TRUY CẬP CHỨC NĂNG NÀY!'); window.location.href='index.php?c=stock&tab=history';</script>";
+            exit;
+        }
+    }
+
     public function create() {
+
+        $this->checkAccess(['ADMIN', 'STOCK']);
         
         $type = $_GET['type'] ?? 'import';
 
-        // Lấy danh sách NCC và NVL để đổ vào Dropdown
         $suppliers = $this->stockModel->getSuppliers('', 'active', 1000, 0);
         $ingredients = $this->stockModel->getIngredients('', '', '', '', 1000, 0);
 
-        // NẾU NGƯỜI DÙNG BẤM XÁC NHẬN (LƯU DỮ LIỆU POST)
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
-            // 1. Nhận thông tin chung của Phiếu
             $receipt_code = trim($_POST['receipt_code']);
             $supplier_id  = ($type === 'import') ? ($_POST['supplier_id'] ?? null) : null; 
             $note         = trim($_POST['note']);
             $created_at   = ($_POST['created_at'] ?? date('Y-m-d')) . ' ' . date('H:i:s'); 
             
-            // Mảng dữ liệu chi tiết hàng hóa (Bắt theo dạng mảng tuyến tính từ form gửi lên)
             $ingredient_ids = $_POST['ingredient_id'] ?? [];
             $quantities     = $_POST['quantity'] ?? [];
             $unit_costs     = $_POST['unit_cost'] ?? [];
@@ -48,13 +59,11 @@ class Stock_receiptController {
                 }
             }
 
-            // Tự động lấy ID người dùng từ Session
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
             $current_user_id = $_SESSION['user_id'] ?? 2; 
 
-            // Đóng gói Data Phiếu chung
             $receiptData = [
                 'receipt_code' => $receipt_code,
                 'supplier_id'  => $supplier_id,
@@ -64,13 +73,11 @@ class Stock_receiptController {
                 'created_at'   => $created_at
             ];
 
-            // 3. Thực thi lưu trữ phân nhánh Nhập hay Xuất
             if (!empty($detailsData)) {
                 if ($type === 'import') {
                     $isSaved = $this->stockModel->createImportReceipt($receiptData, $detailsData);
                     $msgType = 'nhập kho';
                 } else {
-                    // Gọi hàm xử lý xuất kho và trừ tồn an toàn
                     $isSaved = $this->stockModel->createExportReceipt($receiptData, $detailsData);
                     $msgType = 'xuất kho';
                 }
@@ -89,16 +96,14 @@ class Stock_receiptController {
             }
         }
 
-        // 4. Gọi View Form Lập Phiếu tương ứng nếu là phương thức GET (Chỉ gọi 1 lần duy nhất)
         if ($type === 'import') {
             require_once __DIR__ . '/../views/stock/stock_receipt/import_form.php';
         } else {
             require_once __DIR__ . '/../views/stock/stock_receipt/export_form.php';
         }
     }
-    // Hàm xử lý riêng cho tính năng Xem chi tiết Lịch sử phiếu
-    // Hàm xử lý Xem chi tiết (Phân luồng 3 loại phiếu)
     public function show() {
+        $this->checkAccess(['ADMIN', 'STOCK', 'CHEF']);
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         $code = isset($_GET['code']) ? trim($_GET['code']) : '';
         
@@ -116,22 +121,18 @@ class Stock_receiptController {
 
         $details = $this->stockModel->getReceiptDetails($receipt['id']);
 
-        // PHÂN LUỒNG GIAO DIỆN THEO MÃ PHIẾU:
         if (strpos($receipt['receipt_code'], 'PN') === 0) {
-            // Nếu mã bắt đầu bằng PN -> Gọi form Phiếu Nhập
             require_once __DIR__ . '/../views/stock/stock_receipt/show.php';
             
         } elseif (strpos($receipt['receipt_code'], 'KK') === 0) {
-            // Nếu mã bắt đầu bằng KK -> Gọi form Phiếu Kiểm Kê
             require_once __DIR__ . '/../views/stock/stock_receipt/show_audit.php';
             
         } else {
-            // Còn lại (VX) -> Gọi form Phiếu Xuất
             require_once __DIR__ . '/../views/stock/stock_receipt/show_receipt.php';
         }
     }
     public function audit() {
-        // Lấy toàn bộ danh sách nguyên vật liệu để nhân viên đếm
+        $this->checkAccess(['ADMIN', 'STOCK']);
         $ingredients = $this->stockModel->getIngredients('', '', '', '', 1000, 0);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
@@ -148,7 +149,7 @@ class Stock_receiptController {
             $current_qtys   = $_POST['current_qty'] ?? [];
             $actual_qtys    = $_POST['actual_qty'] ?? [];
             $unit_costs     = $_POST['unit_cost'] ?? [];
-            $reasons        = $_POST['reason'] ?? []; // <-- BỔ SUNG DÒNG NÀY ĐỂ HỨNG DỮ LIỆU LÝ DO
+            $reasons        = $_POST['reason'] ?? []; 
 
             $auditDetails = [];
             for ($i = 0; $i < count($ingredient_ids); $i++) {
@@ -163,7 +164,7 @@ class Stock_receiptController {
                             'actual_qty'    => $actual_qty,
                             'difference'    => $diff, 
                             'unit_cost'     => (float)($unit_costs[$i] ?? 0),
-                            'reason'        => trim($reasons[$i] ?? '') // Bây giờ biến $reasons đã tồn tại và lấy đúng dữ liệu
+                            'reason'        => trim($reasons[$i] ?? '') 
                         ];
                     }
                 }
@@ -193,8 +194,27 @@ class Stock_receiptController {
             }
         }
 
-        // Render View Giao diện Kiểm kê
         require_once __DIR__ . '/../views/stock/stock_receipt/audit_form.php';
+    }
+    public function delete() {
+        $this->checkAccess(['ADMIN', 'STOCK']);
+
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($id > 0) {
+            $receipt = $this->stockModel->getReceiptById($id);
+            if ($receipt) {
+                $result = $this->stockModel->deleteReceiptWithRevert($id, $receipt['receipt_type']);
+                if ($result) {
+                    echo "<script>alert('✅ Đã hủy phiếu và hoàn trả số lượng kho thành công!');</script>";
+                } else {
+                    echo "<script>alert('❌ LỖI: Không thể hủy phiếu. Dữ liệu đang được ràng buộc!');</script>";
+                }
+            } else {
+                echo "<script>alert('❌ Không tìm thấy phiếu này!');</script>";
+            }
+        }
+        echo "<script>window.location.href='index.php?c=stock&tab=history';</script>";
+        exit;
     }
 }
 ?>

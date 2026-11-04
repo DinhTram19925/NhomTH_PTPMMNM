@@ -13,7 +13,6 @@
         }
         body { background-color: #f0f2f5; font-family: 'Segoe UI', sans-serif; color: #333; }
         
-        /* Cấu trúc khổ giấy A4 đồng bộ màu vàng đồng */
         .a4-container {
             max-width: 900px;
             margin: 30px auto;
@@ -33,7 +32,6 @@
         .table-invoice th { background-color: var(--charcoal) !important; color: var(--gold-primary) !important; text-transform: uppercase; font-size: 0.9rem; text-align: center; }
         .table-invoice td { vertical-align: middle; font-weight: 500; border: 1px solid #dee2e6; }
         
-        /* Nút quay lại đồng bộ */
         .btn-return-lux { 
             background-color: #ffffff; color: #495057; border: 1.5px solid rgba(201, 160, 80, 0.4); font-weight: 600; transition: all 0.2s ease; 
         }
@@ -51,7 +49,6 @@
 </head>
 <body>
 <div class="a4-container">
-    <!-- Nút công cụ -->
     <div class="d-flex justify-content-between mb-4 no-print">
         <a href="index.php?c=stock&a=index&tab=history" class="btn btn-return-lux px-4 py-2 shadow-sm rounded-3 text-decoration-none d-flex align-items-center gap-2">
              Quay lại 
@@ -61,7 +58,6 @@
         </button>
     </div>
 
-    <!-- Header Hóa Đơn -->
     <div class="receipt-header d-flex justify-content-between align-items-center">
         <div>
             <h2 class="receipt-title m-0">PHIẾU XUẤT KHO</h2>
@@ -73,7 +69,6 @@
         </div>
     </div>
 
-    <!-- Thông tin đối tác & Phiếu -->
     <div class="row g-4 mb-4">
         <div class="col-md-7">
             <div class="info-box h-100">
@@ -105,7 +100,6 @@
         <span class="fw-bold text-dark">Ghi chú:</span> <span class="text-muted fst-italic"><?= htmlspecialchars($receipt['note'] ?? 'Không có ghi chú.') ?></span>
     </div>
 
-    <!-- Bảng chi tiết hàng hóa xuất -->
     <div class="table-responsive">
         <table class="table table-bordered table-invoice mb-5">
             <thead>
@@ -136,7 +130,6 @@
         </table>
     </div>
 
-    <!-- Chữ ký -->
     <div class="row text-center mt-4 pt-4 pb-5">
         <div class="col-4">
             <div class="fw-bold text-dark fs-6">Người lập phiếu</div>
