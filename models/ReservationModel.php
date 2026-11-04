@@ -93,7 +93,42 @@ class ReservationModel
 
         return $this->db->query($sql)->fetchAll();
     }
+// Lấy danh sách bàn có thể đặt theo thời gian và số khách
+public function getAvailableTablesForBooking(
+    string $bookingTime,
+    int $guestCount
+): array {
+    $sql = "
+        SELECT
+            t.id,
+            t.table_name,
+            t.capacity,
+            t.status,
+            a.name AS area_name
+        FROM dining_tables t
+        INNER JOIN areas a ON a.id = t.area_id
+        WHERE t.status = 'Available'
+          AND t.capacity >= ?
+          AND NOT EXISTS (
+              SELECT 1
+              FROM reservations r
+              WHERE r.table_id = t.id
+                AND r.status IN ('Pending', 'Confirmed', 'CheckedIn')
+                AND r.booking_time < DATE_ADD(?, INTERVAL 120 MINUTE)
+                AND DATE_ADD(r.booking_time, INTERVAL 120 MINUTE) > ?
+          )
+        ORDER BY a.id, t.table_name
+    ";
 
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([
+        $guestCount,
+        $bookingTime,
+        $bookingTime
+    ]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
     // Tìm hoặc tạo khách hàng theo số điện thoại
     public function findOrCreateCustomer(
         string $name,
@@ -229,7 +264,98 @@ class ReservationModel
 
     // Cập nhật trạng thái đặt bàn
     
+// Tạo đặt bàn dành riêng cho khách hàng
+public function createCustomerReservation(array $data): string
+{
+    $this->db->beginTransaction();
 
+    try {
+        // Khóa bàn để tránh hai khách đặt cùng một bàn đồng thời
+        $stmt = $this->db->prepare("
+            SELECT id, capacity, status
+            FROM dining_tables
+            WHERE id = ?
+            FOR UPDATE
+        ");
+
+        $stmt->execute([$data['table_id']]);
+        $table = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$table || $table['status'] !== 'Available') {
+            throw new Exception('Bàn không còn khả dụng.');
+        }
+
+        if ((int)$table['capacity'] < (int)$data['guest_count']) {
+            throw new Exception('Bàn không đủ sức chứa.');
+        }
+
+        // Kiểm tra lịch đặt trùng trong vòng 120 phút
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*)
+            FROM reservations
+            WHERE table_id = ?
+              AND status IN ('Pending', 'Confirmed', 'CheckedIn')
+              AND booking_time < DATE_ADD(?, INTERVAL 120 MINUTE)
+              AND DATE_ADD(booking_time, INTERVAL 120 MINUTE) > ?
+        ");
+
+        $stmt->execute([
+            $data['table_id'],
+            $data['booking_time'],
+            $data['booking_time']
+        ]);
+
+        if ((int)$stmt->fetchColumn() > 0) {
+            throw new Exception('Bàn đã có người đặt trong thời gian này.');
+        }
+
+        // Tìm hoặc tạo khách hàng
+        $customerId = $this->findOrCreateCustomer(
+            $data['full_name'],
+            $data['phone'],
+            $data['email'] ?? ''
+        );
+
+        // Tạo mã đặt bàn
+        $bookingCode = 'BK' . date('YmdHis')
+            . random_int(100, 999);
+
+        // Lưu yêu cầu đặt bàn với trạng thái Pending
+        $stmt = $this->db->prepare("
+            INSERT INTO reservations (
+                booking_code,
+                customer_id,
+                table_id,
+                booking_time,
+                guest_count,
+                deposit_amount,
+                special_request,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending')
+        ");
+
+        $stmt->execute([
+            $bookingCode,
+            $customerId,
+            $data['table_id'],
+            $data['booking_time'],
+            $data['guest_count'],
+            $data['deposit_amount'] ?? 0,
+            $data['special_request'] ?? ''
+        ]);
+
+        $this->db->commit();
+
+        return $bookingCode;
+
+    } catch (Throwable $e) {
+        if ($this->db->inTransaction()) {
+            $this->db->rollBack();
+        }
+
+        throw $e;
+    }
+}
 // Lấy ID các bàn có lịch đặt trong tương lai
 public function getUpcomingReservedTableIds(): array
 {

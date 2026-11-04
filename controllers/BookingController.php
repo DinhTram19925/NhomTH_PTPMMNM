@@ -264,7 +264,29 @@ public function index()
                             'Không thể cập nhật. Đặt bàn có thể đã được xử lý hoặc bàn không khả dụng.'
                         );
                     }
+// if ($status === 'CheckedIn') {
+//                         // Lấy thông tin order_id hoặc gắn kết tương ứng từ reservation id $id
+//                         // (Giả sử model của bạn có hàm lấy order_id hoặc mã đơn từ reservation, 
+//                         // hoặc nếu hệ thống dùng trực tiếp order_id, bạn điều chỉnh biến cho khớp nhé)
+//                         $order_id = $model->getOrderIdByReservationId($id) ?? $id; 
+                        
+//                         require_once __DIR__ . '/../../models/StockModel.php';
+//                         $stockModel = new StockModel();
+//                         $current_user_id = $_SESSION['user']['id'] ?? 2;
 
+//                         $bomResult = $stockModel->deductStockByOrder($order_id, $current_user_id);
+                        
+//                         // Nếu kho chạm mức tối thiểu, có thể lưu cảnh báo vào Session để hiển thị ra màn hình
+//                         if ($bomResult['success'] && !empty($bomResult['warnings'])) {
+//                             $_SESSION['stock_warnings'] = $bomResult['warnings'];
+//                         }
+//                     }
+            
+//             // Nếu có cảnh báo nguyên liệu sắp hết, gộp chung vào mảng kết quả trả về cho giao diện POS hiển thị
+//             if (!empty($bomResult['warnings'])) {
+//                 $result['stock_warnings'] = $bomResult['warnings'];
+//             }
+//         }
                     header('Location: index.php?c=booking&a=vip&updated=1');
                     exit;
 
@@ -313,5 +335,123 @@ public function index()
             'topCustomers' => $topCustomers
         ]);
     }
+    // Trang xem bàn dành cho khách hàng
+
+public function customer(): void
+{
+    $model = new ReservationModel();
+
+    $bookingTime = trim($_POST['booking_time'] ?? $_GET['booking_time'] ?? '');
+    $guestCount = (int)($_POST['guest_count'] ?? $_GET['guest_count'] ?? 1);
+
+    $tables = [];
+    $error = '';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST'
+        && ($_POST['action'] ?? '') === 'create') {
+
+        $fullName = trim($_POST['full_name'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $tableId = (int)($_POST['table_id'] ?? 0);
+        $specialRequest = trim($_POST['special_request'] ?? '');
+
+        $date = DateTime::createFromFormat('Y-m-d\TH:i', $bookingTime);
+
+        if ($fullName === '') {
+            $error = 'Vui lòng nhập họ và tên.';
+        } elseif (!preg_match('/^[0-9]{9,11}$/', $phone)) {
+            $error = 'Số điện thoại không hợp lệ.';
+        } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Email không hợp lệ.';
+        } elseif (!$date || $date->format('Y-m-d\TH:i') !== $bookingTime
+            || $date <= new DateTime()) {
+            $error = 'Thời gian đặt bàn không hợp lệ.';
+        } elseif ($guestCount < 1 || $guestCount > 100) {
+            $error = 'Số lượng khách không hợp lệ.';
+        } elseif ($tableId <= 0) {
+            $error = 'Vui lòng chọn bàn.';
+        } else {
+            $table = $model->findTable($tableId);
+
+            if (!$table || $table['status'] !== 'Available') {
+                $error = 'Bàn không còn khả dụng.';
+            } elseif ((int)$table['capacity'] < $guestCount) {
+                $error = 'Bàn không đủ sức chứa số lượng khách.';
+            } elseif (!$model->isTableAvailable(
+                $tableId,
+                $date->format('Y-m-d H:i:s')
+            )) {
+                $error = 'Bàn đã có người đặt trong thời gian này.';
+            } else {
+                // Tính tiền cọc theo số lượng khách
+                $depositAmount = match (true) {
+                    $guestCount <= 4  => 50000,
+                    $guestCount <= 8  => 100000,
+                    $guestCount <= 12 => 150000,
+                    $guestCount <= 20 => 200000,
+                    default           => 300000
+                };
+
+                $bookingCode = $model->createReservation([
+                    'full_name' => $fullName,
+                    'phone' => $phone,
+                    'email' => $email,
+                    'table_id' => $tableId,
+                    'booking_time' => $date->format('Y-m-d H:i:s'),
+                    'guest_count' => $guestCount,
+                    'deposit_amount' => $depositAmount,
+                    'special_request' => $specialRequest
+                ]);
+
+              header(
+    'Location: index.php?c=booking&a=customer&created=' .
+    urlencode($bookingCode) .
+    '&guest_count=' . $guestCount
+);
+exit;
+            }
+        }
+    }
+
+    if ($bookingTime !== '') {
+        $date = DateTime::createFromFormat('Y-m-d\TH:i', $bookingTime);
+
+        if (!$date || $date->format('Y-m-d\TH:i') !== $bookingTime
+            || $date <= new DateTime()) {
+            if ($error === '') {
+                $error = 'Vui lòng chọn thời gian đặt bàn hợp lệ.';
+            }
+        } elseif ($guestCount < 1 || $guestCount > 100) {
+            if ($error === '') {
+                $error = 'Số lượng khách không hợp lệ.';
+            }
+        } else {
+            $tables = $model->getAvailableTablesForBooking(
+                $date->format('Y-m-d H:i:s'),
+                $guestCount
+            );
+        }
+    }
+
+    $success = trim($_GET['created'] ?? '');
+
+    $depositAmount = match (true) {
+        $guestCount <= 4  => 50000,
+        $guestCount <= 8  => 100000,
+        $guestCount <= 12 => 150000,
+        $guestCount <= 20 => 200000,
+        default           => 300000
+    };
+
+    $this->render('booking/customer', compact(
+        'tables',
+        'bookingTime',
+        'guestCount',
+        'error',
+        'success',
+        'depositAmount'
+    ));
+}
 
 }
