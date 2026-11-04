@@ -335,5 +335,123 @@ public function index()
             'topCustomers' => $topCustomers
         ]);
     }
+    // Trang xem bàn dành cho khách hàng
+
+public function customer(): void
+{
+    $model = new ReservationModel();
+
+    $bookingTime = trim($_POST['booking_time'] ?? $_GET['booking_time'] ?? '');
+    $guestCount = (int)($_POST['guest_count'] ?? $_GET['guest_count'] ?? 1);
+
+    $tables = [];
+    $error = '';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST'
+        && ($_POST['action'] ?? '') === 'create') {
+
+        $fullName = trim($_POST['full_name'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $tableId = (int)($_POST['table_id'] ?? 0);
+        $specialRequest = trim($_POST['special_request'] ?? '');
+
+        $date = DateTime::createFromFormat('Y-m-d\TH:i', $bookingTime);
+
+        if ($fullName === '') {
+            $error = 'Vui lòng nhập họ và tên.';
+        } elseif (!preg_match('/^[0-9]{9,11}$/', $phone)) {
+            $error = 'Số điện thoại không hợp lệ.';
+        } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Email không hợp lệ.';
+        } elseif (!$date || $date->format('Y-m-d\TH:i') !== $bookingTime
+            || $date <= new DateTime()) {
+            $error = 'Thời gian đặt bàn không hợp lệ.';
+        } elseif ($guestCount < 1 || $guestCount > 100) {
+            $error = 'Số lượng khách không hợp lệ.';
+        } elseif ($tableId <= 0) {
+            $error = 'Vui lòng chọn bàn.';
+        } else {
+            $table = $model->findTable($tableId);
+
+            if (!$table || $table['status'] !== 'Available') {
+                $error = 'Bàn không còn khả dụng.';
+            } elseif ((int)$table['capacity'] < $guestCount) {
+                $error = 'Bàn không đủ sức chứa số lượng khách.';
+            } elseif (!$model->isTableAvailable(
+                $tableId,
+                $date->format('Y-m-d H:i:s')
+            )) {
+                $error = 'Bàn đã có người đặt trong thời gian này.';
+            } else {
+                // Tính tiền cọc theo số lượng khách
+                $depositAmount = match (true) {
+                    $guestCount <= 4  => 50000,
+                    $guestCount <= 8  => 100000,
+                    $guestCount <= 12 => 150000,
+                    $guestCount <= 20 => 200000,
+                    default           => 300000
+                };
+
+                $bookingCode = $model->createReservation([
+                    'full_name' => $fullName,
+                    'phone' => $phone,
+                    'email' => $email,
+                    'table_id' => $tableId,
+                    'booking_time' => $date->format('Y-m-d H:i:s'),
+                    'guest_count' => $guestCount,
+                    'deposit_amount' => $depositAmount,
+                    'special_request' => $specialRequest
+                ]);
+
+              header(
+    'Location: index.php?c=booking&a=customer&created=' .
+    urlencode($bookingCode) .
+    '&guest_count=' . $guestCount
+);
+exit;
+            }
+        }
+    }
+
+    if ($bookingTime !== '') {
+        $date = DateTime::createFromFormat('Y-m-d\TH:i', $bookingTime);
+
+        if (!$date || $date->format('Y-m-d\TH:i') !== $bookingTime
+            || $date <= new DateTime()) {
+            if ($error === '') {
+                $error = 'Vui lòng chọn thời gian đặt bàn hợp lệ.';
+            }
+        } elseif ($guestCount < 1 || $guestCount > 100) {
+            if ($error === '') {
+                $error = 'Số lượng khách không hợp lệ.';
+            }
+        } else {
+            $tables = $model->getAvailableTablesForBooking(
+                $date->format('Y-m-d H:i:s'),
+                $guestCount
+            );
+        }
+    }
+
+    $success = trim($_GET['created'] ?? '');
+
+    $depositAmount = match (true) {
+        $guestCount <= 4  => 50000,
+        $guestCount <= 8  => 100000,
+        $guestCount <= 12 => 150000,
+        $guestCount <= 20 => 200000,
+        default           => 300000
+    };
+
+    $this->render('booking/customer', compact(
+        'tables',
+        'bookingTime',
+        'guestCount',
+        'error',
+        'success',
+        'depositAmount'
+    ));
+}
 
 }
