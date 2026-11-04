@@ -14,7 +14,7 @@ class PromotionController extends Controller
 
     private function checkAccess(): void
     {
-        $this->requireRole(['ADMIN']);
+        $this->requireRole(['ADMIN','WAITER']);
     }
 
     // Danh sach voucher
