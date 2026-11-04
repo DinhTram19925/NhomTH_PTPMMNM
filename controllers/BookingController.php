@@ -264,7 +264,29 @@ public function index()
                             'Không thể cập nhật. Đặt bàn có thể đã được xử lý hoặc bàn không khả dụng.'
                         );
                     }
+// if ($status === 'CheckedIn') {
+//                         // Lấy thông tin order_id hoặc gắn kết tương ứng từ reservation id $id
+//                         // (Giả sử model của bạn có hàm lấy order_id hoặc mã đơn từ reservation, 
+//                         // hoặc nếu hệ thống dùng trực tiếp order_id, bạn điều chỉnh biến cho khớp nhé)
+//                         $order_id = $model->getOrderIdByReservationId($id) ?? $id; 
+                        
+//                         require_once __DIR__ . '/../../models/StockModel.php';
+//                         $stockModel = new StockModel();
+//                         $current_user_id = $_SESSION['user']['id'] ?? 2;
 
+//                         $bomResult = $stockModel->deductStockByOrder($order_id, $current_user_id);
+                        
+//                         // Nếu kho chạm mức tối thiểu, có thể lưu cảnh báo vào Session để hiển thị ra màn hình
+//                         if ($bomResult['success'] && !empty($bomResult['warnings'])) {
+//                             $_SESSION['stock_warnings'] = $bomResult['warnings'];
+//                         }
+//                     }
+            
+//             // Nếu có cảnh báo nguyên liệu sắp hết, gộp chung vào mảng kết quả trả về cho giao diện POS hiển thị
+//             if (!empty($bomResult['warnings'])) {
+//                 $result['stock_warnings'] = $bomResult['warnings'];
+//             }
+//         }
                     header('Location: index.php?c=booking&a=vip&updated=1');
                     exit;
 
