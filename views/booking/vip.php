@@ -477,9 +477,10 @@ function bookingEscape($value) {
                         <th>Bàn</th>
                         <th>Thời gian</th>
                         <th>Số khách</th>
-                        <th>Tiền cọc</th>
-                        <th>Trạng thái</th>
-                        <th>Thao tác</th>
+                       <th>Tiền cọc</th>
+                       <th>Yêu cầu đặc biệt</th>
+                       <th>Trạng thái</th>
+                       <th>Thao tác</th>
                     </tr>
                 </thead>
 
@@ -488,7 +489,7 @@ function bookingEscape($value) {
                     <?php if (empty($reservations)): ?>
 
                         <tr>
-                            <td colspan="9" style="text-align:center">
+                            <td colspan="10" style="text-align:center">
                                 Chưa có dữ liệu đặt bàn.
                             </td>
                         </tr>
@@ -525,19 +526,24 @@ function bookingEscape($value) {
                                 <td>
                                     <?= bookingEscape($reservation['booking_time']) ?>
                                 </td>
+<!-- Số khách -->
+<td>
+    <?= (int)($reservation['guest_count'] ?? 0) ?>
+</td>
 
-                                <td>
-                                    <?= (int)$reservation['guest_count'] ?>
-                                </td>
+<!-- Tiền cọc -->
+<td>
+    <?= number_format((float)($reservation['deposit_amount'] ?? 0), 0, ',', '.') ?> đ
+</td>
 
-                                <td>
-                                    <?= number_format(
-                                        (float)$reservation['deposit_amount'],
-                                        0,
-                                        ',',
-                                        '.'
-                                    ) ?> đ
-                                </td>
+<!-- Yêu cầu đặc biệt -->
+<td style="white-space: normal; min-width: 200px; max-width: 280px;">
+    <?php if (!empty($reservation['special_request'])): ?>
+        <?= nl2br(bookingEscape($reservation['special_request'])) ?>
+    <?php else: ?>
+        <span style="color: #8492a5;">Không có ghi chú</span>
+    <?php endif; ?>
+</td>
 
                                 <td>
                                     <span
