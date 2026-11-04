@@ -148,6 +148,26 @@ class PosController {
             $d['voucher_code'] ?? '',
             $d['transaction_ref'] ?? ''
         ));
+        if (isset($result['success']) && $result['success'] == true) {
+            $order_id = $data['order_id'];
+            $cashier_id = $data['cashier_id'] ?? ($_SESSION['user']['id'] ?? 2);
+            
+            // 1. Tự động cộng dồn vào "Tổng bán hàng" (Nếu thanh toán bằng tiền mặt)
+            $payment_method = $data['payment_method'] ?? 'cash';
+            // Lấy tổng tiền thanh toán thực tế của đơn hàng từ kết quả trả về hoặc request
+            $total_paid = $result['total_amount'] ?? ($data['total_amount'] ?? 0); 
+
+            if ($payment_method === 'cash' && $total_paid > 0) {
+                require_once __DIR__ . '/../../models/CashShiftModel.php'; // Điều chỉnh đường dẫn thư mục cho đúng nếu cần
+                $cashModel = new CashShiftModel();
+                $cashModel->recordSaleTransaction($cashier_id, $total_paid, 'sales');
+            }
+
+            // 2. Tự động trừ kho theo định lượng BOM và cảnh báo đỏ
+            require_once __DIR__ . '/../../models/StockModel.php';
+            $stockModel = new StockModel();
+            $bomResult = $stockModel->deductStockByOrder($order_id, $cashier_id);
+        }
     }
     // Báo cáo lọc theo ngày
     
