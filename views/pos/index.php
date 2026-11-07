@@ -351,6 +351,7 @@ async function loadBill() {
     if (!PB || PB.status != 'Open') { if (!PB) toast(r.message || 'Không tải được hóa đơn', 1); PB = null; payId = null; }
     rPayList(); rBill();
 }
+// Thay thế hàm rBill() trong views/pos/index.php bằng đoạn code sau:
 function rBill() {
     const el = $('#bill'), c = $('#payCtl');
     if (!PB) { el.innerHTML = '<div class="rd-empty">Chọn một bàn bên trái để xem hóa đơn.</div>'; c.innerHTML = ''; return; }
@@ -362,13 +363,29 @@ function rBill() {
         + L('Phí phục vụ (5%)', money(PB.service))
         + (PB.tier_discount > 0 ? L(`Giảm giá hạng ${esc(PB.tier)}`, '− ' + money(PB.tier_discount)) : '')
         + (PB.voucher_discount > 0 ? L(`Giảm giá voucher ${esc(PB.voucher_code)}`, '− ' + money(PB.voucher_discount)) : '')
+        + (PB.deposit_deducted > 0 ? L('Trừ tiền đặt cọc', '− ' + money(PB.deposit_deducted)) : '')
         + L('Thuế VAT (8%)', money(PB.vat))
         + L('KHÁCH CẦN THANH TOÁN', money(PB.total), 'big');
+
     const blocked = PB.phone_error || PB.voucher_error || PB.unfinished > 0 || PB.subtotal <= 0;
+
     c.innerHTML = `<h3>Thanh toán</h3>
-        <label>Số điện thoại khách (tra hạng thẻ thành viên)</label><input type="tel" value="${esc(PH)}" oninput="PH=this.value" placeholder="09xxxxxxxx">
-        ${PB.customer_name ? `<div class="rd-ok">${esc(PB.customer_name)} · hạng ${esc(PB.tier)}</div>` : ''}${PB.phone_error ? `<div class="rd-er">${esc(PB.phone_error)}</div>` : ''}
-        <label>Voucher</label><select onchange="VC=this.value;loadBill()"><option value="">Không dùng voucher</option>${S.promos.map(p => `<option value="${esc(p.code)}" ${VC == p.code ? 'selected' : ''}>${esc(p.code)} · ${esc(p.name)}</option>`).join('')}</select>
+        <label>Số điện thoại khách (tra hạng thẻ thành viên)</label>
+        <input type="tel" value="${esc(PH)}" oninput="PH=this.value" placeholder="09xxxxxxxx">
+        ${PB.customer_name ? `<div class="rd-ok">${esc(PB.customer_name)} · hạng ${esc(PB.tier)}</div>` : ''}
+        ${PB.phone_error ? `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px;">
+                <div class="rd-er" style="margin:0;">${esc(PB.phone_error)}</div>
+                <button type="button" class="rd-btn rd-btn-gold" style="padding:5px 12px;font-size:12px;" onclick="openCreateCustomerModal('${esc(PH)}')">
+                    + Tạo khách hàng mới
+                </button>
+            </div>
+        ` : ''}
+        <label>Voucher</label>
+        <select onchange="VC=this.value;loadBill()">
+            <option value="">Không dùng voucher</option>
+            ${S.promos.map(p => `<option value="${esc(p.code)}" ${VC == p.code ? 'selected' : ''}>${esc(p.code)} · ${esc(p.name)}</option>`).join('')}
+        </select>
         ${PB.voucher_error ? `<div class="rd-er">${esc(PB.voucher_error)}</div>` : ''}
         <div class="rd-row"><button class="rd-btn rd-btn-line" onclick="loadBill()">Áp dụng</button></div>
         <h4>Phương thức thanh toán</h4>
@@ -377,9 +394,76 @@ function rBill() {
         ${pm != 'Cash' ? `<label>Mã giao dịch / 4 số cuối thẻ</label><input value="${esc(REF)}" oninput="REF=this.value" maxlength="60">` : ''}
         ${PB.unfinished > 0 ? `<div class="rd-er">Còn ${PB.unfinished} món Bếp/Bar chưa làm xong, chưa thể thanh toán.</div>` : ''}
         ${PB.subtotal <= 0 ? '<div class="rd-er">Đơn không còn món nào để thu tiền.</div>' : ''}
-        ${PB.ready_unserved > 0 ? `<div class="rd-hint" style="margin-top:8px">Còn ${PB.ready_unserved} món đã nấu xong chưa bấm "Đã bưng". Khi xác nhận thu tiền, hệ thống tự ghi nhận các món này là đã phục vụ. Nếu khách bỏ món, hãy hủy món trước khi thu.</div>` : ''}
+        ${PB.ready_unserved > 0 ? `<div class="rd-hint" style="margin-top:8px">Còn ${PB.ready_unserved} món đã nấu xong chưa bấm "Đã bưng". Khi xác nhận thu tiền, hệ thống tự ghi nhận các món này là đã phục vụ.</div>` : ''}
         <div class="rd-row end">${PB.subtotal <= 0 ? `<button class="rd-btn rd-btn-del" style="padding:8px 14px" onclick="closeTable(${PB.order_id})">Đóng bàn</button>` : ''}
         <button class="rd-btn rd-btn-gold" ${blocked ? 'disabled' : ''} onclick="payM()">Xác nhận đã thu</button></div>`;
+}
+
+// Thêm hàm mở Popup Tạo khách hàng mới chuẩn giao diện 2 cột ngay dưới hàm rBill():
+function openCreateCustomerModal(prefillPhone = '') {
+    const cleanPhone = String(prefillPhone || '').replace(/\D/g, '');
+    const m = $('#rdModal');
+    m.innerHTML = `
+        <div class="rd-mb" style="width:min(760px, 100%);padding:26px 28px;border-radius:14px;">
+            <h3 style="margin-bottom:18px;font-size:20px;">Thêm khách hàng thành viên mới</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                    <label style="font-weight:600;color:#1e293b;margin-top:0;">Họ và tên khách hàng *</label>
+                    <input id="newCustName" type="text" maxlength="100" placeholder="Nhập đầy đủ họ và tên khách hàng">
+                </div>
+                <div>
+                    <label style="font-weight:600;color:#1e293b;margin-top:0;">Số điện thoại di động *</label>
+                    <input id="newCustPhone" type="tel" maxlength="11" value="${esc(cleanPhone)}" placeholder="Nhập số điện thoại 9-11 chữ số">
+                </div>
+            </div>
+            <div style="margin-top:14px;">
+                <label style="font-weight:600;color:#1e293b;">Địa chỉ Email</label>
+                <input id="newCustEmail" type="email" maxlength="100" placeholder="vidu@email.com">
+            </div>
+            <div class="rd-er" id="rdEr" style="margin-top:10px;"></div>
+            <hr style="margin:18px 0 14px;border-top:1px solid #e2e8f0;">
+            <div class="rd-row end" style="margin-top:0;">
+                <button type="button" class="rd-btn rd-btn-line" onclick="closeM()">Hủy bỏ</button>
+                <button type="button" class="rd-btn rd-btn-gold" id="rdOk">Tạo hồ sơ khách hàng</button>
+            </div>
+        </div>
+    `;
+    m.classList.add('on');
+    setTimeout(() => { const n = $('#newCustName'); if (n) n.focus(); }, 60);
+
+    $('#rdOk').onclick = async () => {
+        const btn = $('#rdOk');
+        const fullName = ($('#newCustName').value || '').trim();
+        const phone    = ($('#newCustPhone').value || '').trim();
+        const email    = ($('#newCustEmail').value || '').trim();
+
+        if (!fullName) {
+            $('#rdEr').textContent = 'Vui lòng nhập họ và tên khách hàng.';
+            return;
+        }
+        if (!/^[0-9]{9,11}$/.test(phone)) {
+            $('#rdEr').textContent = 'Số điện thoại không hợp lệ (9-11 chữ số).';
+            return;
+        }
+
+        btn.disabled = true;
+        const res = await api('quickCreateCustomer', {
+            full_name: fullName,
+            phone: phone,
+            email: email
+        });
+
+        if (res.status !== 'success') {
+            $('#rdEr').textContent = res.message || 'Không thể tạo khách hàng.';
+            btn.disabled = false;
+            return;
+        }
+
+        closeM();
+        PH = res.phone || phone;
+        toast('Đã tạo hội viên ' + fullName + ' và đồng bộ vào CRM!');
+        await loadBill();
+    };
 }
 function payM() {
     const hint = pm == 'Cash' ? 'Hãy nhận đủ tiền mặt trước khi xác nhận.' : pm == 'VietQR' ? 'Chỉ xác nhận khi đã thấy tiền về tài khoản.' : 'Chỉ xác nhận khi máy POS thẻ báo thành công.';

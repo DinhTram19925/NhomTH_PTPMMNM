@@ -1,1225 +1,833 @@
-
 <?php
-$statusInfo = [
-    'Available' => [
-        'label' => 'Bàn trống',
-        'class' => 'available',
-        'icon' => '✓'
-    ],
-    'Occupied' => [
-        'label' => 'Đang phục vụ',
-        'class' => 'occupied',
-        'icon' => '●'
-    ],
-    'Reserved' => [
-        'label' => 'Đã đặt',
-        'class' => 'reserved',
-        'icon' => '◷'
-    ],
-    'Cleaning' => [
-        'label' => 'Đang dọn',
-        'class' => 'cleaning',
-        'icon' => '✦'
-    ]
-];
+$selectedFloor  = (int)($selectedFloor ?? 1);
+$selectedAreaId = (int)($selectedAreaId ?? 0);
+$selectedDate   = $selectedDate ?? date('Y-m-d');
+$isToday        = ($selectedDate === date('Y-m-d'));
+$isAdmin        = !empty($isAdmin);
+$floorsSummary  = $floorsSummary ?? [];
+$areas          = $areas ?? [];
+$flashSuccess   = $flashSuccess ?? '';
+$flashError     = $flashError ?? '';
 
-$statistics = $statistics ?? [];
-$tables = $tables ?? [];
-$reservedTableIds = $reservedTableIds ?? [];
-$groupedTables = [];
 
-// Đồng bộ lịch đặt bàn vào trạng thái hiển thị
-foreach ($tables as &$table) {
-    $tableId = (int)($table['table_id'] ?? 0);
+$standardTables = [];
+$specialRooms   = [];
 
-    if (
-        $tableId > 0 &&
-        $table['status'] === 'Available' &&
-        in_array($tableId, $reservedTableIds, true)
-    ) {
-        $table['status'] = 'Reserved';
-    }
-}
-unset($table);
-$groupedTables = [];
-foreach ($tables as $table) {
-    $areaId = $table['area_id'];
+foreach ($tables as $row) {
+    if (empty($row['table_id'])) continue;
 
-    if (!isset($groupedTables[$areaId])) {
-        $groupedTables[$areaId] = [
-            'name' => $table['area_name'],
-            'surcharge' => $table['surcharge_percent'],
-            'tables' => []
-        ];
-    }
+    $tType = $row['table_type'] ?? 'Standard';
 
-    if ($table['table_id'] !== null) {
-        $groupedTables[$areaId]['tables'][] = $table;
+    if (in_array($tType, ['VIP', 'Premium'], true)) {
+        $specialRooms[] = $row;
+    } else {
+        $standardTables[] = $row;
     }
 }
 
-$totalAreas = count($groupedTables);
-
-$totalTables = count($tables);
-
-$totalAvailable = count(array_filter(
-    $tables,
-    fn($t) => $t['status'] === 'Available'
-));
-
-$totalOccupied = count(array_filter(
-    $tables,
-    fn($t) => $t['status'] === 'Occupied'
-));
-
-$totalReserved = count(array_filter(
-    $tables,
-    fn($t) => $t['status'] === 'Reserved'
-));
-
-$totalCleaning = count(array_filter(
-    $tables,
-    fn($t) => $t['status'] === 'Cleaning'
-));
+function renderChairsAroundLight(int $capacity): array {
+    $cap = in_array($capacity, [4, 8, 12], true) ? $capacity : 4;
+    if ($cap === 4) return ['top' => 2, 'bottom' => 2, 'side' => 0];
+    if ($cap === 8) return ['top' => 3, 'bottom' => 3, 'side' => 1];
+    return ['top' => 5, 'bottom' => 5, 'side' => 1];
+}
 ?>
 
 <style>
-/* =====================================================
-   ROYALDINE 5S - PREMIUM RESTAURANT FLOOR PLAN
-   Phạm vi CSS được giới hạn trong .rd-floorplan
-===================================================== */
-
-.rd-floorplan {
-    --rd-bg: #111925;
-    --rd-panel: #1a2737;
-    --rd-panel-2: #202e40;
-    --rd-border: #354458;
-    --rd-gold: #d8b66c;
-    --rd-gold-light: #f3dfaa;
-    --rd-text: #f4f5f7;
-    --rd-muted: #a4b0c1;
-    --rd-green: #4dd6a0;
-    --rd-red: #ff7d87;
-    --rd-yellow: #efc45e;
-    --rd-gray: #9aa7b7;
-
-    box-sizing: border-box;
-    margin: 0;
-    padding: 28px;
-    min-height: 700px;
-    color: var(--rd-text);
-    background:
-        radial-gradient(
-            ellipse at 90% 0%,
-            #29374a 0%,
-            transparent 38%
-        ),
-        var(--rd-bg);
-    border-radius: 14px;
-    font-family: "Segoe UI", Arial, sans-serif;
+.light-board-wrap {
+    background: #ffffff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 26px 28px;
+    box-shadow: 0 6px 22px rgba(15, 23, 42, 0.05);
 }
-
-.rd-floorplan *,
-.rd-floorplan *::before,
-.rd-floorplan *::after {
-    box-sizing: border-box;
-}
-
-.rd-floorplan button,
-.rd-floorplan input {
-    font: inherit;
-}
-
-.rd-topbar {
+.board-top-bar {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
     flex-wrap: wrap;
-    margin-bottom: 28px;
-}
-
-.rd-eyebrow {
-    color: var(--rd-gold);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-}
-
-.rd-heading {
-    margin: 12px 0 9px;
-    color: var(--rd-gold-light);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(27px, 3vw, 39px);
-    font-weight: 500;
-    letter-spacing: -.5px;
-}
-
-.rd-subtitle {
-    max-width: 650px;
-    margin: 0;
-    color: var(--rd-muted);
-    font-size: 14px;
-    line-height: 1.8;
-}
-
-.rd-primary-btn {
-    display: inline-flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    gap: 9px;
-    padding: 13px 18px;
-    border: 1px solid #e7cd8c;
+    gap: 14px;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid #e2e8f0;
+}
+.board-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+}
+.light-filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.light-input, .light-select {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #0f172a;
     border-radius: 9px;
-    color: #171b21 !important;
-    background: linear-gradient(135deg, #f1dba3, #c8a458);
+    padding: 7px 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+.status-legend-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+.legend-pill {
+    display: inline-block;
+    padding: 5px 16px;
+    border-radius: 999px;
     font-size: 13px;
     font-weight: 700;
-    text-decoration: none !important;
-    transition: .2s ease;
 }
+.legend-available { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.legend-reserved  { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+.legend-occupied  { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.legend-vip       { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
 
-.rd-primary-btn:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.08);
-}
-
-.rd-stats {
+/* Lưới Bàn Thường nền trắng */
+.light-tables-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 25px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 18px;
 }
+@media (max-width: 992px) { .light-tables-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 576px) { .light-tables-grid { grid-template-columns: 1fr; } }
 
-.rd-stat {
+.light-table-box {
+    background: #ffffff;
+    border: 2px solid #22c55e;
+    border-radius: 16px;
+    padding: 18px 14px;
+    text-align: center;
+    cursor: pointer;
     position: relative;
-    overflow: hidden;
-    min-width: 0;
-    padding: 19px;
-    border: 1px solid var(--rd-border);
-    border-radius: 13px;
-    background: linear-gradient(145deg, #202e40, #192434);
-    transition: border-color .2s, transform .2s;
-}
-
-.rd-stat:hover {
-    transform: translateY(-2px);
-    border-color: #d8b66c70;
-}
-
-.rd-stat::after {
-    position: absolute;
-    right: -27px;
-    bottom: -34px;
-    width: 75px;
-    height: 75px;
-    border: 1px solid #d8b66c25;
-    border-radius: 50%;
-    content: "";
-}
-
-.rd-stat-label {
+    transition: all 0.18s ease;
     display: flex;
-    align-items: center;
-    gap: 9px;
-    color: var(--rd-muted);
-    font-size: 12px;
-    line-height: 1.5;
-}
-
-.rd-stat-icon {
-    display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    width: 31px;
-    height: 31px;
-    border: 1px solid #d8b66c50;
-    border-radius: 8px;
-    color: var(--rd-gold);
-    font-size: 15px;
+    min-height: 156px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
 }
-
-.rd-stat-value {
-    margin-top: 15px;
-    color: var(--rd-gold-light);
-    font-size: 31px;
-    font-weight: 700;
-    line-height: 1.1;
+.light-table-box:hover {
+    transform: translateY(-3px);
 }
+.light-table-box.st-available { border-color: #22c55e; background: #f0fdf4; }
+.light-table-box.st-reserved  { border-color: #f59e0b; background: #fffbeb; }
+.light-table-box.st-occupied  { border-color: #ef4444; background: #fef2f2; }
 
-.rd-stat-caption {
-    margin-top: 9px;
-    color: #8997aa;
-    font-size: 11px;
+/* Ghế bao quanh bàn */
+.chair-strip {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 4px 0;
 }
+.chair-bar {
+    width: 22px;
+    height: 6px;
+    border-radius: 4px;
+    background: #16a34a;
+}
+.st-reserved .chair-bar { background: #d97706; }
+.st-occupied .chair-bar { background: #dc2626; }
 
-.rd-toolbar {
+.table-body-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
-
-.rd-legend {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 17px;
-}
-
-.rd-legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    color: #c5ceda;
-    font-size: 12px;
-}
-
-.rd-dot {
-    width: 9px;
-    height: 9px;
-    flex-shrink: 0;
-    border-radius: 50%;
-}
-
-.rd-dot.available { background: var(--rd-green); }
-.rd-dot.occupied { background: var(--rd-red); }
-.rd-dot.reserved { background: var(--rd-yellow); }
-.rd-dot.cleaning { background: var(--rd-gray); }
-
-.rd-search-wrap {
-    position: relative;
-    width: min(100%, 290px);
-}
-
-.rd-search-icon {
-    position: absolute;
-    top: 50%;
-    left: 13px;
-    color: var(--rd-muted);
-    transform: translateY(-50%);
-    pointer-events: none;
-}
-
-.rd-search {
+    justify-content: center;
+    gap: 12px;
     width: 100%;
-    padding: 12px 14px 12px 36px;
-    border: 1px solid var(--rd-border);
-    border-radius: 9px;
-    outline: none;
-    color: var(--rd-text);
-    background: #182333;
-    font-size: 12px;
+    padding: 6px 0;
 }
-
-.rd-search:focus {
-    border-color: var(--rd-gold);
-    box-shadow: 0 0 0 3px #d8b66c14;
+.chair-side-bar {
+    width: 6px;
+    height: 26px;
+    border-radius: 4px;
+    background: #16a34a;
 }
+.st-reserved .chair-side-bar { background: #d97706; }
+.st-occupied .chair-side-bar { background: #dc2626; }
 
-.rd-map-shell {
-    position: relative;
-    overflow: hidden;
-    padding: 20px;
-    border: 1px solid #465368;
-    border-radius: 15px;
-    background-color: #111a27;
-    background-image:
-        linear-gradient(#ffffff06 1px, transparent 1px),
-        linear-gradient(90deg, #ffffff06 1px, transparent 1px);
-    background-size: 24px 24px;
-    box-shadow: inset 0 0 45px #00000025;
+.sofa-icon svg {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 4px;
 }
+.st-available .sofa-icon svg { stroke: #16a34a; }
+.st-reserved .sofa-icon svg  { stroke: #d97706; }
+.st-occupied .sofa-icon svg  { stroke: #dc2626; }
 
-.rd-map-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding-bottom: 15px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #465267;
+.t-code-title {
+    font-size: 19px;
+    font-weight: 800;
+    color: #0f172a;
 }
-
-.rd-map-caption {
-    color: var(--rd-gold);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 2px;
-}
-
-.rd-map-scale {
-    color: #8997aa;
-    font-size: 10px;
-    letter-spacing: 1px;
-}
-
-.rd-map-entrance {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    width: min(270px, 100%);
-    margin: 0 auto 20px;
-    padding: 12px;
-    border: 1px dashed #b89b5e;
-    border-radius: 8px;
-    color: #dfca94;
-    background: #202c3b;
-    font-size: 10px;
+.t-status-sub {
+    font-size: 13px;
     font-weight: 600;
-    letter-spacing: 2px;
+    color: #475569;
+}
+.t-cap-badge {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid #cbd5e1;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.t-area-badge {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
 }
 
-.rd-door {
-    display: inline-block;
-    width: 20px;
-    height: 11px;
-    border: 2px solid var(--rd-gold);
-    border-bottom: 0;
-    border-radius: 10px 10px 0 0;
+/* PHÒNG ĐẶC BIỆT (VIP & PRESIDENT) NỀN SÁNG RÕ NÉT */
+.special-section-divider {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 22px;
+    margin-top: 16px;
 }
-
-.rd-map-service {
-    display: grid;
-    grid-template-columns: minmax(130px, .75fr) minmax(0, 2fr);
-    gap: 14px;
+.special-section-title {
+    font-size: 19px;
+    font-weight: 800;
+    color: #0f172a;
     margin-bottom: 16px;
 }
+.special-rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+@media (max-width: 768px) { .special-rooms-grid { grid-template-columns: 1fr; } }
 
-.rd-map-station {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 85px;
-    padding: 15px;
-    border: 1px solid #465267;
-    border-radius: 9px;
+.special-room-card {
+    border-radius: 16px;
+    padding: 26px 20px;
     text-align: center;
-    background: linear-gradient(145deg, #202e40, #182332);
-}
-
-.rd-map-station strong {
-    color: #e5d09a;
-    font-size: 12px;
-    letter-spacing: 1px;
-}
-
-.rd-map-station span {
-    margin-top: 8px;
-    color: #98a6b8;
-    font-size: 10px;
-    line-height: 1.5;
-}
-
-.rd-map-hallway {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 48px;
-    margin: 12px 0 18px;
-    border-top: 1px dashed #536177;
-    border-bottom: 1px dashed #536177;
-    color: #8492a5;
-    font-size: 10px;
-    letter-spacing: 4px;
-}
-
-.rd-map-rooms {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
-    gap: 18px;
-}
-
-.rd-map-room {
-    position: relative;
-    min-width: 0;
-    padding: 18px;
-    border: 2px solid #526174;
-    border-radius: 12px;
-    background: linear-gradient(145deg, #1d2b3b, #182433);
-    box-shadow: inset 0 0 0 4px #ffffff03;
-}
-
-.rd-map-room.vip-room {
-    border-color: #9b804b;
-    background: linear-gradient(145deg, #302b26, #1b2532 80%);
-}
-
-.rd-map-room-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-    padding-bottom: 15px;
-    margin-bottom: 18px;
-    border-bottom: 1px solid #ffffff18;
-}
-
-.rd-map-room-heading h3 {
-    margin: 0;
-    color: #f0dca6;
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 18px;
-    font-weight: 500;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-}
-
-.rd-map-room-heading p {
-    margin: 7px 0 0;
-    color: #98a5b6;
-    font-size: 11px;
-    line-height: 1.6;
-}
-
-.rd-map-room-tag {
-    flex-shrink: 0;
-    padding: 6px 8px;
-    border: 1px solid #d8b76c55;
-    border-radius: 5px;
-    color: var(--rd-gold);
-    font-size: 9px;
-    letter-spacing: 1px;
-}
-
-.rd-map-tables {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 26px 15px;
-    min-height: 185px;
-    align-content: center;
-    justify-items: center;
-}
-
-.rd-map-table {
-    --table-color: var(--rd-gray);
-
-    width: 100%;
-    max-width: 160px;
-    min-width: 0;
-    padding: 10px 5px;
-    border: 1px solid #465267;
-    border-radius: 10px;
-    color: #edf1f6;
-    background: #223145;
     cursor: pointer;
-    text-align: center;
-    transition: transform .2s, border-color .2s, box-shadow .2s;
+    position: relative;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
 }
-
-.rd-map-table.available { --table-color: var(--rd-green); }
-.rd-map-table.occupied { --table-color: var(--rd-red); }
-.rd-map-table.reserved { --table-color: var(--rd-yellow); }
-.rd-map-table.cleaning { --table-color: var(--rd-gray); }
-
-.rd-map-table:hover {
+.special-room-card:hover {
     transform: translateY(-3px);
-    border-color: var(--table-color);
-    box-shadow: 0 8px 22px #00000030;
 }
-
-.rd-map-table:focus-visible {
-    outline: 2px solid var(--rd-gold-light);
-    outline-offset: 3px;
+.special-room-card.room-vip {
+    background: #faf5ff;
+    border-color: #a855f7;
+    box-shadow: 0 6px 18px rgba(168, 85, 247, 0.08);
 }
+.room-vip .door-svg svg { stroke: #7e22ce; }
+.room-vip .room-price   { color: #7e22ce; }
 
-.rd-table-topdown {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 87px;
-    margin: 0 auto 8px;
+.special-room-card.room-president {
+    background: #fffbeb;
+    border-color: #d97706;
+    box-shadow: 0 6px 18px rgba(217, 119, 6, 0.08);
 }
+.room-president .door-svg svg { stroke: #b45309; }
+.room-president .room-price   { color: #b45309; }
 
-.rd-table-chairs {
+.room-status-corner {
     position: absolute;
-    inset: 0;
-    pointer-events: none;
-}
-
-.rd-table-chairs i {
-    position: absolute;
-    width: 14px;
-    height: 11px;
-    border: 1px solid var(--table-color);
-    border-radius: 4px;
-    background: #28374a;
-}
-
-.rd-table-chairs i:nth-child(1) {
-    top: 7px;
-    left: 23%;
-}
-
-.rd-table-chairs i:nth-child(2) {
-    top: 7px;
-    right: 23%;
-}
-
-.rd-table-chairs i:nth-child(3) {
-    bottom: 7px;
-    left: 23%;
-}
-
-.rd-table-chairs i:nth-child(4) {
-    bottom: 7px;
-    right: 23%;
-}
-
-.rd-table-round {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 59px;
-    height: 59px;
-    border: 2px solid var(--table-color);
-    border-radius: 50%;
-    color: white;
-    background: #172333;
-    box-shadow: 0 0 15px #00000030;
-}
-
-.rd-table-round .capacity-number {
-    font-size: 17px;
+    top: 12px;
+    right: 14px;
+    font-size: 11.5px;
     font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
 }
+.room-status-corner.st-available { background: #dcfce7; color: #15803d; }
+.room-status-corner.st-reserved  { background: #fef3c7; color: #b45309; }
+.room-status-corner.st-occupied  { background: #fee2e2; color: #b91c1c; }
 
-.rd-table-round .capacity-label {
-    margin-top: 1px;
-    font-size: 8px;
-    letter-spacing: 1px;
-}
-
-.rd-map-table-name {
-    display: block;
-    margin-top: 5px;
-    color: #f6f7f9;
-    font-size: 13px;
-    font-weight: 700;
-    overflow-wrap: anywhere;
-}
-
-.rd-map-table-info {
-    display: block;
-    margin-top: 6px;
-    color: #9eacbd;
-    font-size: 10px;
-}
-
-.rd-map-status {
-    display: inline-block;
-    margin-top: 10px;
-    padding: 5px 8px;
-    border-radius: 20px;
-    color: var(--table-color);
-    background: #ffffff08;
-    font-size: 10px;
-    font-weight: 600;
-}
-
-.rd-map-empty {
-    grid-column: 1 / -1;
-    align-self: center;
-    padding: 30px 12px;
-    border: 1px dashed #465267;
-    border-radius: 8px;
-    color: #8997aa;
-    font-size: 12px;
-    text-align: center;
-}
-
-.rd-map-detail {
-    display: none;
-    margin-top: 18px;
-    padding: 20px;
-    border: 1px solid #9b804b;
-    border-radius: 11px;
-    background: linear-gradient(135deg, #263244, #1b2635);
-}
-
-.rd-map-detail.open {
-    display: block;
-}
-
-.rd-map-detail h3 {
-    margin: 0 0 8px;
-    color: var(--rd-gold-light);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 21px;
-}
-
-.rd-map-detail p {
-    margin: 0 0 15px;
-    color: #bac4d2;
-    font-size: 12px;
-    line-height: 1.8;
-}
-
-.rd-detail-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.rd-detail-actions a,
-.rd-detail-close {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 13px;
-    border: 1px solid #d8b66c;
-    border-radius: 7px;
-    color: #171b21 !important;
-    background: #d8b66c;
-    font-size: 12px;
-    font-weight: 700;
-    text-decoration: none !important;
-    cursor: pointer;
-}
-
-.rd-detail-close {
-    color: #e7d9b6 !important;
-    background: transparent;
-    border-color: #536177;
-}
-
-.rd-map-bottom {
-    margin-top: 18px;
-    padding-top: 15px;
-    border-top: 1px solid #465267;
-    color: #8190a4;
-    font-size: 10px;
-    letter-spacing: 1.5px;
-    text-align: center;
-}
-
-.rd-hidden {
-    display: none !important;
-}
-
-.rd-no-results {
-    display: none;
-    padding: 35px 15px;
-    color: #9eacbd;
-    text-align: center;
-}
-
-.rd-no-results.visible {
-    display: block;
-}
-
-.rd-floorplan-note {
-    margin-top: 20px;
-    padding: 14px 17px;
-    border-left: 3px solid var(--rd-gold);
-    border-radius: 0 8px 8px 0;
-    color: var(--rd-muted);
-    background: #d8b66c0c;
-    font-size: 12px;
-    line-height: 1.8;
-}
-
-@media (max-width: 1150px) {
-    .rd-stats {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 760px) {
-    .rd-floorplan {
-        padding: 16px;
-    }
-
-    .rd-map-shell {
-        padding: 12px;
-    }
-
-    .rd-map-rooms {
-        grid-template-columns: 1fr;
-    }
-
-    .rd-map-service {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .rd-map-room {
-        padding: 13px;
-    }
-
-    .rd-map-room-heading h3 {
-        font-size: 16px;
-    }
-
-    .rd-search-wrap {
-        width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .rd-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 9px;
-    }
-
-    .rd-stat {
-        padding: 13px;
-    }
-
-    .rd-stat-value {
-        font-size: 26px;
-    }
-
-    .rd-map-service {
-        grid-template-columns: 1fr;
-    }
-
-    .rd-map-tables {
-        gap: 20px 10px;
-    }
-
-    .rd-map-table {
-        padding: 8px 3px;
-    }
-}
+.door-svg svg { width: 34px; height: 34px; margin-bottom: 8px; }
+.room-name-title { font-size: 20px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 6px; }
+.room-price { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+.room-sub-note { font-size: 13px; font-weight: 600; color: #64748b; }
 </style>
 
-<div class="rd-floorplan">
+<div class="light-board-wrap">
+    <?php if ($flashSuccess !== ''): ?>
+        <div class="alert alert-success py-2 fw-semibold"><?= htmlspecialchars($flashSuccess) ?></div>
+    <?php endif; ?>
+    <?php if ($flashError !== ''): ?>
+        <div class="alert alert-danger py-2 fw-semibold"><?= htmlspecialchars($flashError) ?></div>
+    <?php endif; ?>
 
-    <!-- TIÊU ĐỀ -->
-    <header class="rd-topbar">
+    <!-- Thanh công cụ trên cùng -->
+    <div class="board-top-bar">
         <div>
-            <div class="rd-eyebrow">
-                RoyalDine 5S · Restaurant Management
+            <h2 class="board-title">
+                Sơ đồ bàn – <?= $selectedFloor > 0 ? 'Floor ' . $selectedFloor : 'Tất cả tầng' ?>
+            </h2>
+            <div class="small text-muted mt-1">
+                Ngày kiểm tra lịch: <strong class="text-primary"><?= date('d/m/Y', strtotime($selectedDate)) ?></strong>
+                <?= $isToday ? '(Hôm nay - Đồng bộ trực tiếp với POS)' : '(Xem & Đặt lịch trước)' ?>
             </div>
-
-            <h1 class="rd-heading">Sơ đồ mặt bằng nhà hàng</h1>
-
-            <p class="rd-subtitle">
-                Quản lý không gian, theo dõi trạng thái bàn và chuẩn bị
-                trải nghiệm phục vụ cao cấp.
-            </p>
         </div>
 
-        <a class="rd-primary-btn"
-           href="index.php?c=booking&a=vip">
-            <span>＋</span> Đặt bàn VIP
-        </a>
-        <a class="rd-primary-btn"
-   href="index.php?c=booking&a=manage">
-    <span>⚙</span> Quản lý bàn
-</a>
-    </header>
+        <form method="GET" action="index.php" class="light-filter-group" id="boardFilterForm">
+            <input type="hidden" name="c" value="booking">
+            <input type="hidden" name="a" value="index">
 
-    <!-- THỐNG KÊ -->
-    <section class="rd-stats">
-
-        <article class="rd-stat">
-            <div class="rd-stat-label">
-                <span class="rd-stat-icon">▦</span>
-                Tổng số bàn
+            <div>
+                <input type="date" name="date" class="light-input"
+                       value="<?= htmlspecialchars($selectedDate) ?>"
+                       onchange="document.getElementById('boardFilterForm').submit();">
             </div>
-            <div class="rd-stat-value"><?= $totalTables ?></div>
-            <div class="rd-stat-caption">Toàn bộ nhà hàng</div>
-        </article>
 
-        <article class="rd-stat">
-            <div class="rd-stat-label">
-                <span class="rd-stat-icon">✓</span>
-                Bàn trống
+            <div>
+                <select name="floor" class="light-select" onchange="document.getElementById('boardFilterForm').submit();">
+                    <option value="0" <?= $selectedFloor === 0 ? 'selected' : '' ?>>Tất cả các tầng</option>
+                    <?php foreach ($floorsSummary as $fl): ?>
+                        <?php $fNum = (int)$fl['floor_number']; ?>
+                        <option value="<?= $fNum ?>" <?= $selectedFloor === $fNum ? 'selected' : '' ?>>
+                            Floor <?= $fNum ?> (<?= (int)$fl['standard_tables'] ?> bàn • <?= (int)$fl['vip_rooms'] + (int)$fl['premium_rooms'] ?> phòng)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
-            <div class="rd-stat-value"><?= $totalAvailable ?></div>
-            <div class="rd-stat-caption">Sẵn sàng phục vụ</div>
-        </article>
 
-        <article class="rd-stat">
-            <div class="rd-stat-label">
-                <span class="rd-stat-icon">♧</span>
-                Đang phục vụ
+            <div>
+                <select name="area_id" class="light-select" onchange="document.getElementById('boardFilterForm').submit();">
+                    <option value="0">-- Tất cả khu vực --</option>
+                    <?php foreach ($areas as $ar): ?>
+                        <?php if ($selectedFloor > 0 && (int)$ar['floor_number'] !== $selectedFloor) continue; ?>
+                        <option value="<?= (int)$ar['id'] ?>" <?= $selectedAreaId === (int)$ar['id'] ? 'selected' : '' ?>>
+                            [Tầng <?= (int)$ar['floor_number'] ?>] <?= htmlspecialchars($ar['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
-            <div class="rd-stat-value"><?= $totalOccupied ?></div>
-            <div class="rd-stat-caption">Khách đang dùng bữa</div>
-        </article>
 
-        <article class="rd-stat">
-            <div class="rd-stat-label">
-                <span class="rd-stat-icon">◷</span>
-                Đã đặt trước
-            </div>
-            <div class="rd-stat-value"><?= $totalReserved ?></div>
-            <div class="rd-stat-caption">Bàn đã có lịch đặt</div>
-        </article>
-
-        <article class="rd-stat">
-            <div class="rd-stat-label">
-                <span class="rd-stat-icon">✦</span>
-                Đang dọn
-            </div>
-            <div class="rd-stat-value"><?= $totalCleaning ?></div>
-            <div class="rd-stat-caption">Chuẩn bị đón khách</div>
-        </article>
-
-    </section>
-
-    <!-- CHÚ GIẢI VÀ TÌM KIẾM -->
-    <div class="rd-toolbar">
-        <div class="rd-legend">
-            <?php foreach ($statusInfo as $info): ?>
-                <span class="rd-legend-item">
-                    <i class="rd-dot <?= $info['class'] ?>"></i>
-                    <?= htmlspecialchars($info['label']) ?>
-                </span>
-            <?php endforeach; ?>
-        </div>
-
-        <label class="rd-search-wrap">
-            <span class="rd-search-icon">⌕</span>
-            <input
-                type="search"
-                id="rd-search"
-                class="rd-search"
-                placeholder="Tìm tên bàn hoặc khu vực..."
-                aria-label="Tìm tên bàn hoặc khu vực">
-        </label>
+            <?php if ($isAdmin): ?>
+                <button type="button" class="btn btn-warning btn-sm fw-bold px-3 py-2"
+                        data-bs-toggle="modal" data-bs-target="#adminCreateModal">
+                    + Thêm Bàn / Phòng (ADMIN)
+                </button>
+                <a href="index.php?c=booking&a=manage" class="btn btn-outline-dark btn-sm fw-bold px-3 py-2">
+                    ⚙️ Setup Bàn & Phòng
+                </a>
+            <?php endif; ?>
+        </form>
     </div>
 
-    <!-- SƠ ĐỒ MẶT BẰNG -->
-    <div class="rd-map-shell">
+    <!-- 4 Badge Trạng thái -->
+    <div class="status-legend-bar">
+        <span class="legend-pill legend-available">Trống</span>
+        <span class="legend-pill legend-reserved">Đã đặt</span>
+        <span class="legend-pill legend-occupied">Đang dùng</span>
+        <span class="legend-pill legend-vip">VIP</span>
+    </div>
 
-        <div class="rd-map-top">
-            <div class="rd-map-caption">
-                ✦ RoyalDine · Floor Plan
-            </div>
-
-            <div class="rd-map-scale">
-                SƠ ĐỒ MINH HỌA · KHÔNG THEO TỶ LỆ
-            </div>
-        </div>
-
-        <!-- LỐI VÀO -->
-        <div class="rd-map-entrance">
-            <span class="rd-door"></span>
-            LỐI VÀO NHÀ HÀNG
-            <span class="rd-door"></span>
-        </div>
-
-        <!-- KHU VỰC PHỤC VỤ -->
-        <div class="rd-map-service">
-            <div class="rd-map-station">
-                <strong>✦ LỄ TÂN</strong>
-                <span>Đón khách · Check-in</span>
-            </div>
-
-            <div class="rd-map-station">
-                <strong>ROYAL SERVICE</strong>
-                <span>Khu vực điều phối và phục vụ</span>
-            </div>
-        </div>
-
-        <div class="rd-map-hallway">
-            LỐI ĐI CHÍNH
-        </div>
-
-        <!-- CÁC PHÒNG ĐƯỢC TẠO TỪ DATABASE -->
-        <div class="rd-map-rooms" id="rd-map-rooms">
-
-            <?php foreach ($groupedTables as $areaId => $area): ?>
-
+    <!-- PHẦN 1: BÀN TIÊU CHUẨN (CÓ GHẾ 4-8-12 BAO QUANH + PHÂN TRANG) -->
+    <?php if (empty($standardTables)): ?>
+        <div class="text-center text-muted py-4">Chưa có bàn tiêu chuẩn nào ở khu vực/tầng này.</div>
+    <?php else: ?>
+        <div class="light-tables-grid">
+            <?php foreach ($standardTables as $t): ?>
                 <?php
-                $areaName = $area['name'];
-                $surcharge = (float)$area['surcharge'];
+                $eff     = $t['effective_status'] ?? 'Available';
+                $stClass = $eff === 'Occupied' ? 'st-occupied' : ($eff === 'Reserved' ? 'st-reserved' : 'st-available');
+                $stText  = $eff === 'Occupied' ? 'Đang dùng' : ($eff === 'Reserved' ? 'Đã đặt' : 'Trống');
+                $chairs  = renderChairsAroundLight((int)$t['capacity']);
+                $dayBk   = $t['day_booking'] ?? null;
 
-                $isVip = $surcharge > 0
-                    || stripos($areaName, 'VIP') !== false;
-
-                $areaSearchText = mb_strtolower(
-                    $areaName,
-                    'UTF-8'
-                );
+                $payload = [
+                    'table_id'       => (int)$t['table_id'],
+                    'table_name'     => $t['table_name'],
+                    'table_type'     => 'Standard',
+                    'capacity'       => (int)$t['capacity'],
+                    'area_id'        => (int)$t['area_id'],
+                    'area_name'      => $t['area_name'],
+                    'floor_number'   => (int)$t['floor_number'],
+                    'eff_status'     => $eff,
+                    'status_text'    => $stText,
+                    'deposit_default'=> TableModel::calculateDepositByTable($t, (int)$t['capacity']),
+                    'active_order_id'=> (int)($t['active_order_id'] ?? 0),
+                    'active_subtotal'=> (float)($t['active_subtotal'] ?? 0),
+                    'booking_id'     => (int)($dayBk['id'] ?? 0),
+                    'booking_code'   => $dayBk['booking_code'] ?? '',
+                    'booking_status' => $dayBk['status'] ?? '',
+                    'customer_name'  => $dayBk['customer_name'] ?? '',
+                    'customer_phone' => $dayBk['customer_phone'] ?? '',
+                    'booking_time'   => !empty($dayBk['booking_time']) ? date('H:i d/m/Y', strtotime($dayBk['booking_time'])) : '',
+                    'guest_count'    => (int)($dayBk['guest_count'] ?? 0),
+                    'deposit_amount' => (float)($dayBk['deposit_amount'] ?? 0),
+                ];
                 ?>
+                <div class="light-table-box <?= $stClass ?>"
+                     onclick='openTableActionModal(<?= htmlspecialchars(json_encode($payload, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)'>
+                    <span class="t-area-badge"><?= htmlspecialchars($t['area_name']) ?></span>
+                    <span class="t-cap-badge"><?= (int)$t['capacity'] ?> ghế</span>
 
-                <section
-                    class="rd-map-room <?= $isVip ? 'vip-room' : '' ?>"
-                    data-area="<?= htmlspecialchars($areaSearchText, ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="chair-strip">
+                        <?php for ($i = 0; $i < $chairs['top']; $i++): ?><span class="chair-bar"></span><?php endfor; ?>
+                    </div>
 
-                    <div class="rd-map-room-heading">
+                    <div class="table-body-row">
+                        <?php if ($chairs['side'] > 0): ?><span class="chair-side-bar"></span><?php endif; ?>
                         <div>
-                            <h3>
-                                <?= htmlspecialchars($areaName, ENT_QUOTES, 'UTF-8') ?>
-                            </h3>
+                            <div class="sofa-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 11V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3"/>
+                                    <path d="M2 11h20v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5Z"/>
+                                    <path d="M4 18v2"/><path d="M20 18v2"/>
+                                </svg>
+                            </div>
+                            <div class="t-code-title"><?= htmlspecialchars($t['table_name']) ?></div>
+                            <div class="t-status-sub">
+                                <?= $stText ?>
+                                <?php if ($eff === 'Reserved' && !empty($dayBk['booking_time'])): ?>
+                                    (<?= date('H:i', strtotime($dayBk['booking_time'])) ?>)
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php if ($chairs['side'] > 0): ?><span class="chair-side-bar"></span><?php endif; ?>
+                    </div>
 
-                            <p>
-                                Khu vực <?= (int)$areaId ?>
-                                · Phụ thu <?= number_format($surcharge) ?>%
-                                · <?= count($area['tables']) ?> bàn
-                            </p>
+                    <div class="chair-strip">
+                        <?php for ($i = 0; $i < $chairs['bottom']; $i++): ?><span class="chair-bar"></span><?php endfor; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="special-section-divider">
+        <h3 class="special-section-title">Phòng đặc biệt</h3>
+        <?php if (empty($specialRooms)): ?>
+            <div class="text-muted small">Tầng/Khu vực này hiện chưa có Phòng VIP hoặc Phòng Thượng Hạng.</div>
+        <?php else: ?>
+            <div class="special-rooms-grid">
+                <?php foreach ($specialRooms as $rm): ?>
+                    <?php
+                    $rType     = $rm['table_type'] ?? 'VIP';
+                    $isPrem    = ($rType === 'Premium');
+                    $roomClass = $isPrem ? 'room-president' : 'room-vip';
+                    $minDep    = $isPrem ? TableModel::DEPOSIT_PREMIUM : TableModel::DEPOSIT_VIP;
+                    $eff       = $rm['effective_status'] ?? 'Available';
+                    $stClass   = $eff === 'Occupied' ? 'st-occupied' : ($eff === 'Reserved' ? 'st-reserved' : 'st-available');
+                    $stText    = $eff === 'Occupied' ? 'Đang dùng' : ($eff === 'Reserved' ? 'Đã đặt' : 'Trống');
+                    $dayBk     = $rm['day_booking'] ?? null;
+
+                    $payload = [
+                        'table_id'       => (int)$rm['table_id'],
+                        'table_name'     => $rm['table_name'],
+                        'table_type'     => $rType,
+                        'capacity'       => (int)$rm['capacity'],
+                        'area_id'        => (int)$rm['area_id'],
+                        'area_name'      => $rm['area_name'],
+                        'floor_number'   => (int)$rm['floor_number'],
+                        'eff_status'     => $eff,
+                        'status_text'    => $stText,
+                        'deposit_default'=> $minDep,
+                        'active_order_id'=> (int)($rm['active_order_id'] ?? 0),
+                        'active_subtotal'=> (float)($rm['active_subtotal'] ?? 0),
+                        'booking_id'     => (int)($dayBk['id'] ?? 0),
+                        'booking_code'   => $dayBk['booking_code'] ?? '',
+                        'booking_status' => $dayBk['status'] ?? '',
+                        'customer_name'  => $dayBk['customer_name'] ?? '',
+                        'customer_phone' => $dayBk['customer_phone'] ?? '',
+                        'booking_time'   => !empty($dayBk['booking_time']) ? date('H:i d/m/Y', strtotime($dayBk['booking_time'])) : '',
+                        'guest_count'    => (int)($dayBk['guest_count'] ?? 0),
+                        'deposit_amount' => (float)($dayBk['deposit_amount'] ?? 0),
+                    ];
+                    ?>
+                    <div class="special-room-card <?= $roomClass ?>"
+                         onclick='openTableActionModal(<?= htmlspecialchars(json_encode($payload, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)'>
+                        <span class="room-status-corner <?= $stClass ?>">
+                            <?= $stText ?> • <?= (int)$rm['capacity'] ?> ghế
+                        </span>
+
+                        <div class="door-svg">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M13 4h3a2 2 0 0 1 2 2v14"/>
+                                <path d="M2 20h3"/><path d="M13 20h9"/>
+                                <path d="M10 12v.01"/>
+                                <path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/>
+                            </svg>
                         </div>
 
-                        <span class="rd-map-room-tag">
-                            <?= $isVip ? 'VIP PRIVATE' : 'DINING HALL' ?>
-                        </span>
+                        <div class="room-name-title"><?= htmlspecialchars($rm['table_name']) ?></div>
+                        <div class="room-price"><?= number_format($minDep, 0, ',', '.') ?>đ</div>
+                        <div class="room-sub-note">Tiền cọc tối thiểu</div>
                     </div>
-
-                    <div class="rd-map-tables">
-
-                        <?php if (empty($area['tables'])): ?>
-                            <div class="rd-map-empty">
-                                Khu vực chưa có bàn.
-                            </div>
-                        <?php endif; ?>
-
-                        <?php foreach ($area['tables'] as $table): ?>
-
-                            <?php
-                            $status = $table['status'];
-
-                            $info = $statusInfo[$status] ?? [
-                                'label' => $status,
-                                'class' => 'cleaning',
-                                'icon' => '•'
-                            ];
-
-                            $tableName = $table['table_name'];
-                            $tableSearchText = mb_strtolower(
-                                $tableName,
-                                'UTF-8'
-                            );
-                            ?>
-
-                            <button
-                                type="button"
-                                class="rd-map-table <?= $info['class'] ?>"
-                                data-name="<?= htmlspecialchars($tableName, ENT_QUOTES, 'UTF-8') ?>"
-                                data-name-search="<?= htmlspecialchars($tableSearchText, ENT_QUOTES, 'UTF-8') ?>"
-                                data-area-name="<?= htmlspecialchars($areaName, ENT_QUOTES, 'UTF-8') ?>"
-                                data-area-search="<?= htmlspecialchars($areaSearchText, ENT_QUOTES, 'UTF-8') ?>"
-                                data-capacity="<?= (int)$table['capacity'] ?>"
-                                data-status="<?= htmlspecialchars($status, ENT_QUOTES, 'UTF-8') ?>"
-                                data-status-label="<?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?>"
-                                data-id="<?= (int)$table['table_id'] ?>"
-                                data-surcharge="<?= number_format($surcharge, 0) ?>"
-                                aria-label="Xem thông tin bàn <?= htmlspecialchars($tableName, ENT_QUOTES, 'UTF-8') ?>">
-
-                                <span class="rd-table-topdown">
-                                    <span class="rd-table-chairs">
-                                        <i></i>
-                                        <i></i>
-                                        <i></i>
-                                        <i></i>
-                                    </span>
-
-                                    <span class="rd-table-round">
-                                        <span class="capacity-number">
-                                            <?= (int)$table['capacity'] ?>
-                                        </span>
-                                        <span class="capacity-label">
-                                            KHÁCH
-                                        </span>
-                                    </span>
-                                </span>
-
-                                <span class="rd-map-table-name">
-                                    <?= htmlspecialchars($tableName, ENT_QUOTES, 'UTF-8') ?>
-                                </span>
-
-                                <span class="rd-map-table-info">
-                                    Mã bàn #<?= (int)$table['table_id'] ?>
-                                </span>
-
-                                <span class="rd-map-status">
-                                    <?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?>
-                                </span>
-                            </button>
-
-                        <?php endforeach; ?>
-
-                    </div>
-                </section>
-
-            <?php endforeach; ?>
-
-        </div>
-
-        <div id="rd-no-results" class="rd-no-results">
-            Không tìm thấy bàn hoặc khu vực phù hợp.
-        </div>
-
-        <!-- CHI TIẾT BÀN KHI BẤM -->
-        <section
-            id="rd-map-detail"
-            class="rd-map-detail"
-            aria-live="polite">
-
-            <h3 id="rd-detail-title">Thông tin bàn</h3>
-
-            <p id="rd-detail-info"></p>
-
-            <div class="rd-detail-actions">
-                <a id="rd-detail-booking"
-                   href="index.php?c=booking&a=vip">
-                    Mở trang đặt bàn VIP
-                </a>
-
-                <button
-                    type="button"
-                    id="rd-detail-close"
-                    class="rd-detail-close">
-                    Đóng chi tiết
-                </button>
+                <?php endforeach; ?>
             </div>
-        </section>
-
-        <div class="rd-map-bottom">
-            ROYALDINE 5S · PREMIUM DINING EXPERIENCE
-        </div>
-
+        <?php endif; ?>
     </div>
 </div>
 
+<!-- POPUP ĐẶT BÀN / CHECK-IN CUKCUK / XÓA & SỬA NHANH (ADMIN) NỀN SÁNG -->
+<div class="modal fade" id="tableActionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-white text-dark">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold" id="modalTableTitle">B01</h5>
+                    <div class="small text-muted" id="modalTableSubtitle">Tầng 1 • Sức chứa 4 ghế</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- 1. KHI BÀN TRỐNG: HIỆN FORM ĐẶT BÀN -->
+                <div id="modalAvailableSection" style="display:none;">
+                    <?php if ($isToday): ?>
+                        <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded-3 border mb-3">
+                            <div>
+                                <div class="fw-bold text-success">Khách vào ngồi dùng bữa ngay?</div>
+                                <div class="small text-muted">Mở order trực tiếp trên màn hình POS</div>
+                            </div>
+                            <a href="#" id="modalOpenPosBtn" class="btn btn-success btn-sm fw-bold px-3">
+                                🍽️ Mở POS gọi món
+                            </a>
+                        </div>
+                    <?php endif; ?>
+
+                    <h6 class="fw-bold text-primary mb-3">📅 Đặt lịch giữ bàn / phòng (Ngày <?= date('d/m/Y', strtotime($selectedDate)) ?>)</h6>
+                    <form method="POST" action="index.php?c=booking&a=vip">
+                        <input type="hidden" name="action" value="create">
+                        <input type="hidden" name="redirect_to" value="index">
+                        <input type="hidden" name="return_floor" value="<?= (int)$selectedFloor ?>">
+                        <input type="hidden" name="return_date" value="<?= htmlspecialchars($selectedDate) ?>">
+                        <input type="hidden" name="table_id" id="bookFormTableId">
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Họ và tên khách hàng <span class="text-danger">*</span></label>
+                            <input type="text" name="full_name" class="form-control form-control-sm" maxlength="150" required>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Số điện thoại (10-11 số, bắt đầu 0) <span class="text-danger">*</span></label>
+                                <input type="tel" name="phone" class="form-control form-control-sm"
+                                       pattern="0[0-9]{9,10}" minlength="10" maxlength="11"
+                                       placeholder="VD: 0901234567"
+                                       title="Số điện thoại phải bắt đầu bằng số 0 và có 10-11 chữ số" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Số lượng khách <span class="text-danger">*</span></label>
+                                <input type="number" name="guest_count" id="bookFormGuestCount" class="form-control form-control-sm" min="1" max="12" value="4" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Email</label>
+                            <input type="email" name="email" class="form-control form-control-sm" placeholder="khachhang@email.com">
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Giờ khách đến <span class="text-danger">*</span></label>
+                                <input type="datetime-local" name="booking_time" id="bookFormTime" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Tiền đặt cọc (VNĐ) <span class="text-danger">*</span></label>
+                                <input type="number" name="deposit_amount" id="bookFormDeposit" class="form-control form-control-sm text-danger fw-bold" min="0" step="10000" required>
+                            </div>
+                        </div>
+                        <div class="small text-primary fw-semibold mb-2" id="bookFormRuleNote"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Yêu cầu đặc biệt</label>
+                            <input type="text" name="special_request" class="form-control form-control-sm" placeholder="VD: Sinh nhật, ghế trẻ em...">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">
+                            Xác Nhận Đặt Bàn / Phòng
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 2. KHI BÀN ĐÃ ĐẶT / ĐANG DÙNG -->
+                <div id="modalBusySection" style="display:none;">
+                    <div class="alert alert-warning mb-3">
+                        <div class="fw-bold mb-1">⚠️ Bàn/Phòng này đã có lịch đặt hoặc đang phục vụ!</div>
+                        <div class="small" id="busyAlertDetails"></div>
+                    </div>
+                    <div id="busyCukCukActions" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- 3. QUẢN TRỊ SỬA / XÓA NHANH (CHỈ ADMIN) -->
+                <?php if ($isAdmin): ?>
+                    <hr class="my-3">
+                    <div class="bg-light p-3 rounded-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-bold text-dark">🛠️ Sửa / Xóa bàn này (ADMIN ONLY)</span>
+                            <form method="POST" action="index.php?c=booking&a=manage"
+                                  onsubmit="return confirm('Xác nhận xóa vĩnh viễn bàn/phòng này khỏi sơ đồ?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="redirect_to" value="index">
+                                <input type="hidden" name="return_floor" value="<?= (int)$selectedFloor ?>">
+                                <input type="hidden" name="return_date" value="<?= htmlspecialchars($selectedDate) ?>">
+                                <input type="hidden" name="id" id="adminDeleteTableId">
+                                <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2">🗑️ Xóa bàn/phòng</button>
+                            </form>
+                        </div>
+
+                        <form method="POST" action="index.php?c=booking&a=manage" class="row g-2">
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="redirect_to" value="index">
+                            <input type="hidden" name="return_floor" value="<?= (int)$selectedFloor ?>">
+                            <input type="hidden" name="return_date" value="<?= htmlspecialchars($selectedDate) ?>">
+                            <input type="hidden" name="id" id="adminEditTableId">
+
+                            <div class="col-4">
+                                <label class="form-label small mb-1">Mã Label</label>
+                                <input type="text" name="table_name" id="adminEditTableName" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small mb-1">Loại</label>
+                                <select name="table_type" id="adminEditTableType" class="form-select form-select-sm">
+                                    <option value="Standard">Bàn thường</option>
+                                    <option value="VIP">Phòng VIP (5Tr)</option>
+                                    <option value="Premium">President (10Tr)</option>
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small mb-1">Số ghế</label>
+                                <select name="capacity" id="adminEditTableCap" class="form-select form-select-sm">
+                                    <option value="4">4 ghế</option>
+                                    <option value="8">8 ghế</option>
+                                    <option value="12">12 ghế</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small mb-1">Thuộc Khu vực / Tầng</label>
+                                <select name="area_id" id="adminEditAreaId" class="form-select form-select-sm">
+                                    <?php foreach ($areas as $ar): ?>
+                                        <option value="<?= (int)$ar['id'] ?>">
+                                            [Tầng <?= (int)$ar['floor_number'] ?>] <?= htmlspecialchars($ar['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <button type="submit" class="btn btn-sm btn-dark w-100 fw-bold">Lưu cấu hình bàn/phòng</button>
+                            </div>
+                        </form>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL TẠO BÀN / PHÒNG MỚI (ADMIN) -->
+<?php if ($isAdmin): ?>
+<div class="modal fade" id="adminCreateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-white text-dark">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">+ Tạo Bàn hoặc Phòng Đặc Biệt (ADMIN)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="index.php?c=booking&a=manage">
+                    <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="redirect_to" value="index">
+                    <input type="hidden" name="return_floor" value="<?= (int)$selectedFloor ?>">
+                    <input type="hidden" name="return_date" value="<?= htmlspecialchars($selectedDate) ?>">
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Chọn Tầng & Khu vực</label>
+                        <select name="area_id" class="form-select" required>
+                            <?php foreach ($areas as $ar): ?>
+                                <option value="<?= (int)$ar['id'] ?>" <?= (int)$ar['floor_number'] === $selectedFloor ? 'selected' : '' ?>>
+                                    [Tầng <?= (int)$ar['floor_number'] ?>] <?= htmlspecialchars($ar['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Tên Label (VD: B07, VIP 02, PRESIDENT 02)</label>
+                        <input type="text" name="table_name" class="form-control" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="form-label small fw-semibold">Phân loại</label>
+                            <select name="table_type" class="form-select">
+                                <option value="Standard">🪑 Bàn tiêu chuẩn</option>
+                                <option value="VIP">🚪 Phòng VIP (Cọc 5.000.000đ)</option>
+                                <option value="Premium">🚪 Phòng Thượng Hạng / President (Cọc 10.000.000đ)</option>
+                            </select>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small fw-semibold">Sức chứa</label>
+                            <select name="capacity" class="form-select">
+                                <option value="4">4 ghế</option>
+                                <option value="8">8 ghế</option>
+                                <option value="12">12 ghế</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Tạo Lên Sơ Đồ</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
-(function () {
-    const root = document.querySelector('.rd-floorplan');
+const SELECTED_DATE = <?= json_encode($selectedDate) ?>;
+const RETURN_FLOOR  = <?= (int)$selectedFloor ?>;
 
-    if (!root) {
-        return;
-    }
+function openTableActionModal(data) {
+    const modalEl = document.getElementById('tableActionModal');
+    const modal = new bootstrap.Modal(modalEl);
 
-    const searchInput = root.querySelector('#rd-search');
-    const rooms = Array.from(root.querySelectorAll('.rd-map-room'));
-    const tables = Array.from(root.querySelectorAll('.rd-map-table'));
-    const noResults = root.querySelector('#rd-no-results');
+    const typeText = data.table_type === 'Premium'
+        ? 'Phòng Thượng Hạng (President)'
+        : (data.table_type === 'VIP' ? 'Phòng VIP' : 'Bàn tiêu chuẩn');
 
-    const detail = root.querySelector('#rd-map-detail');
-    const detailTitle = root.querySelector('#rd-detail-title');
-    const detailInfo = root.querySelector('#rd-detail-info');
-    const closeButton = root.querySelector('#rd-detail-close');
-    const bookingLink = root.querySelector('#rd-detail-booking');
+    document.getElementById('modalTableTitle').textContent = data.table_name + ' — ' + data.status_text;
+    document.getElementById('modalTableSubtitle').textContent =
+        'Floor ' + data.floor_number + ' • ' + data.area_name + ' • ' + typeText + ' (' + data.capacity + ' ghế)';
 
-    // Tìm bàn theo tên bàn hoặc khu vực.
-    if (searchInput) {
-        searchInput.addEventListener('input', function () {
-            const keyword = this.value
-                .trim()
-                .toLocaleLowerCase('vi');
+    const availSec = document.getElementById('modalAvailableSection');
+    const busySec  = document.getElementById('modalBusySection');
 
-            let visibleRoomCount = 0;
-            let visibleTableCount = 0;
+    if (data.eff_status === 'Available') {
+        availSec.style.display = 'block';
+        busySec.style.display  = 'none';
 
-            rooms.forEach(function (room) {
-                const roomArea = (
-                    room.dataset.area || ''
-                ).toLocaleLowerCase('vi');
+        document.getElementById('bookFormTableId').value = data.table_id;
+        const guestInput = document.getElementById('bookFormGuestCount');
+        guestInput.max   = data.capacity;
+        guestInput.value = Math.min(4, data.capacity);
 
-                let roomHasVisibleTable = false;
+        document.getElementById('bookFormTime').value = SELECTED_DATE + 'T19:00';
 
-                room.querySelectorAll('.rd-map-table').forEach(
-                    function (table) {
-                        const tableName = (
-                            table.dataset.nameSearch || ''
-                        ).toLocaleLowerCase('vi');
+        const depInput = document.getElementById('bookFormDeposit');
+        const ruleNote = document.getElementById('bookFormRuleNote');
 
-                        const tableArea = (
-                            table.dataset.areaSearch || ''
-                        ).toLocaleLowerCase('vi');
+        if (data.table_type === 'VIP') {
+            depInput.value = 5000000;
+            depInput.readOnly = true;
+            ruleNote.textContent = '🔒 Rule bắt buộc Phòng VIP: Tiền cọc cố định 5.000.000đ.';
+        } else if (data.table_type === 'Premium') {
+            depInput.value = 10000000;
+            depInput.readOnly = true;
+            ruleNote.textContent = '🔒 Rule bắt buộc Phòng Thượng Hạng / President: Tiền cọc cố định 10.000.000đ.';
+        } else {
+            depInput.value = data.deposit_default || 50000;
+            depInput.readOnly = false;
+            ruleNote.textContent = '🪑 Bàn tiêu chuẩn (' + data.capacity + ' ghế): Có thể điều chỉnh tiền cọc.';
+        }
 
-                        const matched = keyword === ''
-                            || tableName.includes(keyword)
-                            || tableArea.includes(keyword)
-                            || roomArea.includes(keyword);
+        const openPosBtn = document.getElementById('modalOpenPosBtn');
+        if (openPosBtn) {
+            openPosBtn.href = 'index.php?c=pos&a=index&table_id=' + data.table_id;
+        }
+    } else {
+        availSec.style.display = 'none';
+        busySec.style.display  = 'block';
 
-                        table.classList.toggle(
-                            'rd-hidden',
-                            !matched
-                        );
+        const detailsEl = document.getElementById('busyAlertDetails');
+        const actionsEl = document.getElementById('busyCukCukActions');
+        actionsEl.innerHTML = '';
 
-                        if (matched) {
-                            roomHasVisibleTable = true;
-                            visibleTableCount++;
-                        }
-                    }
-                );
+        if (data.eff_status === 'Occupied') {
+            detailsEl.innerHTML = `
+                <div>Trạng thái: <strong class="text-danger">Đang dùng bữa tại nhà hàng</strong></div>
+                <div>Tạm tính hiện tại: <strong>${Number(data.active_subtotal || 0).toLocaleString('vi-VN')}đ</strong></div>
+            `;
+            actionsEl.innerHTML = `
+                <a href="index.php?c=pos&a=index&table_id=${data.table_id}" class="btn btn-danger fw-bold w-100">
+                    🍽️ Mở Màn Hình POS Của Bàn Này
+                </a>
+            `;
+        } else {
+            detailsEl.innerHTML = `
+                <div>Mã đặt chỗ: <strong>${data.booking_code || 'Giữ chỗ'}</strong> (${data.booking_status || 'Reserved'})</div>
+                <div>Khách hàng: <strong>${data.customer_name || 'Khách đặt trước'}</strong> — SĐT: <strong>${data.customer_phone || '---'}</strong></div>
+                <div>Giờ hẹn: <strong>${data.booking_time || SELECTED_DATE}</strong> • Số khách: <strong>${data.guest_count || data.capacity}</strong></div>
+                <div>Tiền cọc: <strong class="text-danger">${Number(data.deposit_amount || 0).toLocaleString('vi-VN')}đ</strong></div>
+            `;
 
-                // Khu vực không có bàn vẫn hiện khi ô tìm kiếm rỗng.
-                const hasTables = room.querySelectorAll(
-                    '.rd-map-table'
-                ).length > 0;
-
-                const shouldShowRoom = keyword === ''
-                    ? true
-                    : roomHasVisibleTable
-                        || (!hasTables && roomArea.includes(keyword));
-
-                room.classList.toggle(
-                    'rd-hidden',
-                    !shouldShowRoom
-                );
-
-                if (shouldShowRoom) {
-                    visibleRoomCount++;
+            if (data.booking_id > 0) {
+                let btns = '';
+                if (data.booking_status === 'Pending') {
+                    btns += `
+                        <form method="POST" action="index.php?c=booking&a=vip" class="flex-fill">
+                            <input type="hidden" name="action" value="status">
+                            <input type="hidden" name="redirect_to" value="index">
+                            <input type="hidden" name="return_floor" value="${RETURN_FLOOR}">
+                            <input type="hidden" name="return_date" value="${SELECTED_DATE}">
+                            <input type="hidden" name="id" value="${data.booking_id}">
+                            <button type="submit" name="status" value="Confirmed" class="btn btn-primary btn-sm w-100 fw-bold">
+                                ✔️ Xác nhận đã nhận cọc
+                            </button>
+                        </form>
+                    `;
                 }
-            });
-
-            noResults.classList.toggle(
-                'visible',
-                keyword !== '' && visibleTableCount === 0
-                    && visibleRoomCount === 0
-            );
-
-            if (keyword !== '' && visibleTableCount === 0) {
-                const hasEmptyAreaMatch = rooms.some(function (room) {
-                    return room.querySelectorAll('.rd-map-table').length === 0
-                        && (room.dataset.area || '')
-                            .toLocaleLowerCase('vi').includes(keyword);
-                });
-
-                noResults.classList.toggle(
-                    'visible',
-                    !hasEmptyAreaMatch
-                );
+                if (data.booking_status === 'Confirmed') {
+                    btns += `
+                        <form method="POST" action="index.php?c=booking&a=vip" class="flex-fill">
+                            <input type="hidden" name="action" value="status">
+                            <input type="hidden" name="redirect_to" value="index">
+                            <input type="hidden" name="return_floor" value="${RETURN_FLOOR}">
+                            <input type="hidden" name="return_date" value="${SELECTED_DATE}">
+                            <input type="hidden" name="id" value="${data.booking_id}">
+                            <input type="hidden" name="table_id" value="${data.table_id}">
+                            <button type="submit" name="status" value="CheckedIn" class="btn btn-success btn-sm w-100 fw-bold">
+                                🍽️ Khách nhận bàn (Check-in POS)
+                            </button>
+                        </form>
+                    `;
+                }
+                btns += `
+                    <form method="POST" action="index.php?c=booking&a=vip" onsubmit="return confirm('Hủy lịch đặt bàn này?');">
+                        <input type="hidden" name="action" value="status">
+                        <input type="hidden" name="redirect_to" value="index">
+                        <input type="hidden" name="return_floor" value="${RETURN_FLOOR}">
+                        <input type="hidden" name="return_date" value="${SELECTED_DATE}">
+                        <input type="hidden" name="id" value="${data.booking_id}">
+                        <button type="submit" name="status" value="Cancelled" class="btn btn-outline-danger btn-sm fw-bold">
+                            Hủy lịch
+                        </button>
+                    </form>
+                `;
+                actionsEl.innerHTML = btns;
             }
-        });
+        }
     }
 
-    // Bấm bàn để xem thông tin.
-    tables.forEach(function (table) {
-        table.addEventListener('click', function () {
-            detailTitle.textContent =
-                'Bàn ' + this.dataset.name;
-
-            detailInfo.textContent =
-                'Khu vực: ' + this.dataset.areaName
-                + ' | Sức chứa: ' + this.dataset.capacity + ' khách'
-                + ' | Trạng thái: ' + this.dataset.statusLabel
-                + ' | Phụ thu khu vực: ' + this.dataset.surcharge + '%';
-
-            bookingLink.href =
-                'index.php?c=booking&a=vip&table_id='
-                + encodeURIComponent(this.dataset.id);
-
-            detail.classList.add('open');
-
-            detail.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest'
-            });
-        });
-    });
-
-    if (closeButton) {
-        closeButton.addEventListener('click', function () {
-            detail.classList.remove('open');
-        });
+    const delIdEl = document.getElementById('adminDeleteTableId');
+    if (delIdEl) {
+        delIdEl.value = data.table_id;
+        document.getElementById('adminEditTableId').value   = data.table_id;
+        document.getElementById('adminEditTableName').value = data.table_name;
+        document.getElementById('adminEditTableType').value = data.table_type;
+        document.getElementById('adminEditTableCap').value  = data.capacity;
+        document.getElementById('adminEditAreaId').value    = data.area_id;
     }
-})();
+
+    modal.show();
+}
 </script>

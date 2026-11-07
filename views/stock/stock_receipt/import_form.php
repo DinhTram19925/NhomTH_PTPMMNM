@@ -2,7 +2,6 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Lập Phiếu Nhập Kho - RoyalDine 5S</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root {
@@ -113,9 +112,6 @@
             <h3 class="fw-bold m-0" style="color: var(--charcoal); letter-spacing: 0.5px; text-transform: uppercase;">
                 LẬP PHIẾU NHẬP KHO
             </h3>
-            <div class="text-muted fw-semibold mt-1" style="font-size: 0.9rem;">
-                Chi nhánh: <span class="text-primary">Chi nhánh Trung tâm</span> | Ngày lập: <?= date('d/m/Y') ?>
-            </div>
         </div>
         <button onclick="history.back()" class="btn btn-return-lux px-4 py-2 shadow-sm rounded-3">
              Quay lại 

@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../models/PromotionModel.php';
 
@@ -14,10 +13,9 @@ class PromotionController extends Controller
 
     private function checkAccess(): void
     {
-        $this->requireRole(['ADMIN','WAITER']);
+        $this->requireRole(['ADMIN', 'HOSTESS', 'WAITER', 'CASHIER']);
     }
 
-    // Danh sach voucher
     public function index(): void
     {
         $this->checkAccess();
@@ -31,7 +29,6 @@ class PromotionController extends Controller
         ]);
     }
 
-    // Form them voucher
     public function create(): void
     {
         $this->checkAccess();
@@ -41,7 +38,6 @@ class PromotionController extends Controller
         ]);
     }
 
-    // Luu voucher moi
     public function store(): void
     {
         $this->checkAccess();
@@ -64,7 +60,6 @@ class PromotionController extends Controller
         exit;
     }
 
-    // Form sua voucher
     public function edit(): void
     {
         $this->checkAccess();
@@ -82,7 +77,6 @@ class PromotionController extends Controller
         ]);
     }
 
-    // Cap nhat voucher
     public function update(): void
     {
         $this->checkAccess();
@@ -107,7 +101,6 @@ class PromotionController extends Controller
         exit;
     }
 
-    // Bat hoac tat voucher
     public function toggle(): void
     {
         $this->checkAccess();
@@ -121,7 +114,6 @@ class PromotionController extends Controller
         exit;
     }
 
-    // Xoa voucher
     public function delete(): void
     {
         $this->checkAccess();
@@ -135,7 +127,6 @@ class PromotionController extends Controller
         exit;
     }
 
-    // Kiem thu voucher
     public function testVoucher(): void
     {
         $this->checkAccess();

@@ -21,13 +21,6 @@
     </style>
 </head>
 <body onload="window.print(); window.onafterprint = function(){ window.close(); }">
-
-    <div class="text-center fw-bold">
-        <h3>TRUNG TÂM ĐIỀU HÀNH KHO</h3>
-        <p style="margin: 0;">CN: Chi Nhánh Trung Tâm</p>
-        <p style="margin: 0; font-size: 11px;">(Hệ thống quản lý RoyalDine 5S)</p>
-    </div>
-
     <div class="divider-solid"></div>
     <div class="text-center fw-bold">
         <h4>BÁO CÁO KẾT THÚC CA (Z-REPORT)</h4>

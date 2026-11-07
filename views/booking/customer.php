@@ -1,836 +1,275 @@
 <?php
-$groupedTables = [];
+$selectedFloor  = (int)($selectedFloor ?? 1);
+$selectedAreaId = (int)($selectedAreaId ?? 0);
+$selectedDate   = $selectedDate ?? date('Y-m-d');
+$floorsSummary  = $floorsSummary ?? [];
+$areas          = $areas ?? [];
+$success        = $success ?? '';
+$error          = $error ?? '';
+$isTestPaid     = isset($_GET['test_paid']) && $_GET['test_paid'] === '1';
 
-foreach ($tables as $table) {
-    $groupedTables[$table['area_name']][] = $table;
+
+$standardTables = [];
+$specialRooms   = [];
+
+foreach ($tables as $row) {
+    if (empty($row['table_id'])) continue;
+
+    $tType = $row['table_type'] ?? 'Standard';
+
+    if (in_array($tType, ['VIP', 'Premium'], true)) {
+        $specialRooms[] = $row;
+    } else {
+        $standardTables[] = $row;
+    }
 }
 
-$selectedTableId = (int)($_POST['table_id'] ?? 0);
-$success = $success ?? '';
-$error = $error ?? '';
-
-$guestCount = (int)($guestCount ?? 1);
-
-$depositAmount = $depositAmount ?? match (true) {
-    $guestCount <= 4  => 50000,
-    $guestCount <= 8  => 100000,
-    $guestCount <= 12 => 150000,
-    $guestCount <= 20 => 200000,
-    default           => 300000
-};
+function renderCustChairsLight(int $capacity): array {
+    $cap = in_array($capacity, [4, 8, 12], true) ? $capacity : 4;
+    if ($cap === 4) return ['top' => 2, 'bottom' => 2, 'side' => 0];
+    if ($cap === 8) return ['top' => 3, 'bottom' => 3, 'side' => 1];
+    return ['top' => 5, 'bottom' => 5, 'side' => 1];
+}
 ?>
 
 <style>
-.customer-booking {
+.cust-light-wrap {
     max-width: 1150px;
-    margin: 35px auto;
-    color: #263247;
-}
-
-.customer-booking .page-title {
-    color: #17243b;
-    font-weight: 800;
-}
-
-.customer-booking .booking-card {
-    background: #fff;
-    border: 1px solid #e5e8ef;
-    border-radius: 14px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 16px rgba(20, 35, 60, .05);
-}
-
-.customer-booking .section-title {
-    color: #17243b;
-    font-weight: 700;
-    margin-bottom: 18px;
-}
-
-.customer-booking .area-title {
-    background: #17243b;
-    color: #e5bd69;
-    padding: 13px 18px;
-    border-radius: 9px;
-    font-weight: 700;
-    margin-bottom: 16px;
-}
-
-.customer-booking .table-option {
-    width: 100%;
-    height: 100%;
-    min-height: 145px;
-    padding: 18px 12px;
-    border: 2px solid #e3e7ed;
-    border-radius: 12px;
-    background: #fff;
-    cursor: pointer;
-    transition: .2s;
-    color: #263247;
-}
-
-.customer-booking .table-option:hover {
-    border-color: #c69b45;
-    transform: translateY(-3px);
-}
-
-.customer-booking .table-option.selected {
-    border-color: #c69b45;
-    background: #fff9eb;
-    box-shadow: 0 0 0 2px rgba(198, 155, 69, .15);
-}
-
-.customer-booking .table-option .table-name {
-    font-size: 19px;
-    font-weight: 800;
-}
-
-.customer-booking .table-option .capacity {
-    color: #687386;
-    margin: 8px 0;
-}
-
-.customer-booking .available-label {
-    color: #198754;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.customer-booking .selected-label {
-    color: #a77920;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.customer-booking .btn-gold {
-    background: #c69b45;
-    border: 1px solid #c69b45;
-    color: #17243b;
-    font-weight: 700;
-    padding: 11px 22px;
-    border-radius: 8px;
-}
-
-.customer-booking .btn-gold:hover {
-    background: #b28735;
-    color: #fff;
-}
-
-.customer-booking .form-control {
-    border-radius: 8px;
-    padding: 10px 12px;
-}
-
-.customer-booking .form-label {
-    font-weight: 600;
-}
-</style>
-
-<div class="container customer-booking">
-
-    <div class="text-center mb-4">
-        <h2 class="page-title">ĐẶT BÀN NHÀ HÀNG</h2>
-        <p class="text-muted">
-            Chọn thời gian, số lượng khách và bàn phù hợp với bạn.
-        </p>
-    </div>
-
-    <!-- MÀN HÌNH THANH TOÁN MÔ PHỎNG -->
-    <?php if ($success !== ''): ?>
-
-        <div class="booking-card text-center">
-
-            <h4 class="text-success">Thanh toán đặt cọc</h4>
-
-            <p>Mã đặt bàn:</p>
-
-            <h5><?= htmlspecialchars($success) ?></h5>
-
-            <h3 class="text-danger my-3">
-                <?= number_format($depositAmount, 0, ',', '.') ?>đ
-            </h3>
-
-           <!-- QR TRANG TRÍ ROYALDINE 5S -->
-<div class="royaldine-qr-card mx-auto my-4">
-
-    <div class="royaldine-qr-header">
-        <div class="royaldine-crown">♛</div>
-        <div>
-            <h4>RoyalDine 5S</h4>
-            <p>THANH TOÁN ĐẶT CỌC</p>
-        </div>
-    </div>
-
-    <div class="royaldine-qr-body">
-
-        <div class="royaldine-qr-frame">
-
-            <div class="qr-corner top-left"></div>
-            <div class="qr-corner top-right"></div>
-            <div class="qr-corner bottom-left"></div>
-            <div class="qr-corner bottom-right"></div>
-
-            <div class="royaldine-fake-qr">
-                <?php
-                $qrSeed = crc32($success);
-
-                for ($i = 0; $i < 441; $i++):
-                    $row = intdiv($i, 21);
-                    $col = $i % 21;
-
-                    $isFinder =
-                        ($row < 7 && $col < 7) ||
-                        ($row < 7 && $col >= 14) ||
-                        ($row >= 14 && $col < 7);
-
-                    $dark = (($qrSeed >> ($i % 32)) ^ ($i * 17 + $row * 7 + $col * 13)) % 3 !== 0;
-                ?>
-                    <span class="<?= $dark || $isFinder ? 'dark' : '' ?>"></span>
-                <?php endfor; ?>
-            </div>
-
-            <div class="royaldine-qr-logo">♛</div>
-
-        </div>
-
-        <div class="royaldine-transfer">
-
-            <small>NỘI DUNG CHUYỂN KHOẢN</small>
-
-            <strong><?= htmlspecialchars($success) ?></strong>
-
-        </div>
-
-        <div class="royaldine-qr-note">
-            <i class="bi bi-info-circle"></i>
-        </div>
-
-    </div>
-</div>
-
-<style>
-.royaldine-qr-card {
-    max-width: 340px;
-    overflow: hidden;
-    border: 2px solid #c69b45;
+    margin: 28px auto;
+    background: #ffffff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
     border-radius: 18px;
-    background: #fff;
-    box-shadow: 0 8px 25px rgba(0,0,0,.12);
+    padding: 26px;
+    box-shadow: 0 6px 22px rgba(15, 23, 42, 0.05);
 }
+.cust-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 18px; }
+.cust-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+@media (max-width: 768px) { .cust-grid-3, .cust-grid-2 { grid-template-columns: 1fr; } }
 
-.royaldine-qr-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 16px;
-    color: #f5d78d;
-    background: linear-gradient(135deg,#101b30,#263a58);
+.cust-table-box {
+    background: #f0fdf4; border: 2px solid #22c55e; border-radius: 16px;
+    padding: 18px 14px; text-align: center; cursor: pointer; position: relative; min-height: 150px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
+.cust-table-box.st-reserved { background: #fffbeb; border-color: #f59e0b; cursor: not-allowed; opacity: 0.75; }
+.cust-table-box.st-occupied { background: #fef2f2; border-color: #ef4444; cursor: not-allowed; opacity: 0.75; }
 
-.royaldine-crown {
-    font-size: 43px;
-    color: #e5bd69;
-}
+.c-chair-row { display: flex; gap: 8px; margin: 4px 0; }
+.c-chair-bar { width: 20px; height: 6px; border-radius: 4px; background: #16a34a; }
+.st-reserved .c-chair-bar { background: #d97706; }
+.st-occupied .c-chair-bar { background: #dc2626; }
+.c-chair-side { width: 6px; height: 24px; border-radius: 4px; background: #16a34a; }
+.st-reserved .c-chair-side { background: #d97706; }
+.st-occupied .c-chair-side { background: #dc2626; }
 
-.royaldine-qr-header h4 {
-    margin: 0;
-    font-weight: 800;
-    color: #e5bd69;
+.cust-room-box {
+    border-radius: 16px; padding: 24px 20px; text-align: center; cursor: pointer; position: relative;
 }
-
-.royaldine-qr-header p {
-    margin: 3px 0 0;
-    font-size: 11px;
-    letter-spacing: 1px;
-}
-
-.royaldine-qr-body {
-    padding: 22px;
-    text-align: center;
-}
-
-.royaldine-qr-frame {
-    width: 240px;
-    height: 240px;
-    max-width: 100%;
-    position: relative;
-    margin: auto;
-    padding: 13px;
-    background: white;
-}
-
-.royaldine-fake-qr {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    grid-template-columns: repeat(21,1fr);
-    gap: 1px;
-    background: white;
-    padding: 3px;
-}
-
-.royaldine-fake-qr span.dark {
-    background: #101827;
-}
-
-.royaldine-qr-logo {
-    position: absolute;
-    width: 48px;
-    height: 48px;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%,-50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 4px solid white;
-    border-radius: 50%;
-    background: #17243b;
-    color: #e5bd69;
-    font-size: 30px;
-}
-
-.qr-corner {
-    position: absolute;
-    width: 28px;
-    height: 28px;
-    border-color: #c69b45;
-    border-style: solid;
-    z-index: 2;
-}
-
-.qr-corner.top-left {
-    top: 0;
-    left: 0;
-    border-width: 4px 0 0 4px;
-}
-
-.qr-corner.top-right {
-    top: 0;
-    right: 0;
-    border-width: 4px 4px 0 0;
-}
-
-.qr-corner.bottom-left {
-    bottom: 0;
-    left: 0;
-    border-width: 0 0 4px 4px;
-}
-
-.qr-corner.bottom-right {
-    bottom: 0;
-    right: 0;
-    border-width: 0 4px 4px 0;
-}
-
-.royaldine-transfer {
-    margin-top: 20px;
-    padding: 12px;
-    border: 1px solid #e5bd69;
-    border-radius: 10px;
-    background: #fff9eb;
-}
-
-.royaldine-transfer small {
-    display: block;
-    color: #8c6824;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.royaldine-transfer strong {
-    color: #17243b;
-    font-size: 16px;
-    overflow-wrap: anywhere;
-}
-
-.royaldine-qr-note {
-    margin-top: 12px;
-    font-size: 12px;
-    color: #9a752d;
-}
+.cust-room-box.room-vip { background: #faf5ff; border: 2px solid #a855f7; }
+.cust-room-box.room-president { background: #fffbeb; border: 2px solid #d97706; }
+.cust-room-box.is-busy { opacity: 0.65; cursor: not-allowed; }
 </style>
 
-            <p>Nội dung chuyển khoản:</p>
-
-            <strong><?= htmlspecialchars($success) ?></strong>
-
-            <div class="alert alert-info mt-3" id="paymentWaiting">
-                Đang xác nhận thanh toán mô phỏng...
-                <h3 id="countdown">5</h3>
-            </div>
-
-            <div class="alert alert-success mt-3"
-                 id="paymentSuccess"
-                 style="display:none">
-
-                <h4>
-                    <i class="bi bi-check-circle-fill"></i>
-                    Thanh toán thành công!
-                </h4>
-
-                <p class="mb-0">
-                   
-                </p>
-
-            </div>
-
-            <a href="index.php?c=booking&a=customer"
-               class="btn-gold d-inline-block mt-3">
-
-                Quay lại trang đặt bàn
-
-            </a>
-
-        </div>
-
-        <script>
-        document.addEventListener('DOMContentLoaded', function () {
-
-            let seconds = 5;
-
-            const countdown = document.getElementById('countdown');
-            const waiting = document.getElementById('paymentWaiting');
-            const success = document.getElementById('paymentSuccess');
-
-            const timer = setInterval(function () {
-
-                seconds--;
-
-                countdown.textContent = seconds;
-
-                if (seconds <= 0) {
-
-                    clearInterval(timer);
-
-                    waiting.style.display = 'none';
-
-                    success.style.display = 'block';
-                }
-
-            }, 1000);
-
-        });
-        </script>
-
-    <?php endif; ?>
-
-
-    <!-- CHỈ HIỂN THỊ FORM KHI CHƯA TẠO ĐẶT BÀN -->
-    <?php if ($success === ''): ?>
-
-        <?php if ($error !== ''): ?>
-
-            <div class="alert alert-danger">
-                <?= htmlspecialchars($error) ?>
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- 1. CHỌN THỜI GIAN VÀ SỐ LƯỢNG KHÁCH -->
-        <div class="booking-card">
-
-            <h5 class="section-title">1. Thông tin đặt bàn</h5>
-
-            <form method="GET" action="index.php" class="row g-3">
-
-                <input type="hidden" name="c" value="booking">
-                <input type="hidden" name="a" value="customer">
-
-                <div class="col-md-5">
-
-                    <label class="form-label">
-                        Ngày và giờ đặt
-                    </label>
-
-                    <input
-                        type="datetime-local"
-                        name="booking_time"
-                        class="form-control"
-                        value="<?= htmlspecialchars($bookingTime) ?>"
-                        required
-                    >
-
-                </div>
-
-                <div class="col-md-3">
-
-                    <label class="form-label">
-                        Số lượng khách
-                    </label>
-
-                    <input
-                        type="number"
-                        name="guest_count"
-                        class="form-control"
-                        min="1"
-                        max="100"
-                        value="<?= $guestCount ?>"
-                        required
-                    >
-
-                </div>
-
-                <div class="col-md-4 d-flex align-items-end">
-
-                    <button type="submit" class="btn-gold w-100">
-
-                        <i class="bi bi-search"></i>
-                        Xem bàn trống
-
-                    </button>
-
-                </div>
-
-            </form>
-
-        </div>
-
-
-        <!-- 2. DANH SÁCH BÀN -->
-        <?php if ($bookingTime !== '' && $tables): ?>
-
-            <div class="booking-card">
-
-                <h5 class="section-title">
-                    2. Chọn bàn của bạn
-                </h5>
-
-                <?php foreach ($groupedTables as $areaName => $areaTables): ?>
-
-                    <div class="mb-4">
-
-                        <div class="area-title">
-                            <?= htmlspecialchars($areaName) ?>
-                        </div>
-
-                        <div class="row g-3">
-
-                            <?php foreach ($areaTables as $table): ?>
-
-                                <?php $tableId = (int)$table['id']; ?>
-
-                                <div class="col-6 col-md-3">
-
-                                    <button
-                                        type="button"
-                                        class="table-option <?= $selectedTableId === $tableId ? 'selected' : '' ?>"
-                                        data-id="<?= $tableId ?>"
-                                        data-name="<?= htmlspecialchars($table['table_name'], ENT_QUOTES) ?>"
-                                        data-capacity="<?= (int)$table['capacity'] ?>"
-                                    >
-
-                                        <div class="table-name">
-                                            <?= htmlspecialchars($table['table_name']) ?>
-                                        </div>
-
-                                        <div class="capacity">
-                                            <?= (int)$table['capacity'] ?> khách
-                                        </div>
-
-                                        <div class="available-label">
-
-                                            <i class="bi bi-check-circle"></i>
-                                            Bàn còn trống
-
-                                        </div>
-
-                                        <div class="selected-label mt-1"
-                                             style="<?= $selectedTableId === $tableId ? '' : 'display:none' ?>">
-
-                                            Đang chọn
-
-                                        </div>
-
-                                    </button>
-
-                                </div>
-
-                            <?php endforeach; ?>
-
-                        </div>
-
-                    </div>
-
-                <?php endforeach; ?>
-
-            </div>
-
-        <?php elseif ($bookingTime !== '' && !$error): ?>
-
-            <div class="alert alert-warning">
-
-                Không có bàn phù hợp trong thời gian này.
-                Vui lòng chọn thời gian hoặc số lượng khách khác.
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- 3. FORM THÔNG TIN KHÁCH HÀNG -->
-        <div class="booking-card"
-             id="customerForm"
-             style="<?= $selectedTableId > 0 ? '' : 'display:none' ?>">
-
-            <h5 class="section-title">
-                3. Thông tin khách hàng
-            </h5>
-
-            <div class="alert alert-warning">
-
-                <strong>Tiền đặt cọc dự kiến:</strong>
-
-                <span id="depositAmount">
-                    <?= number_format($depositAmount, 0, ',', '.') ?>đ
-                </span>
-
-                <p class="mb-0 mt-1">
-
-                    Tiền cọc được khấu trừ vào hóa đơn khi khách sử dụng dịch vụ.
-                    Phụ phí khu vực (nếu có) sẽ được tính vào hóa đơn sau.
-
-                </p>
-
-            </div>
-
-
-            <div class="alert alert-info">
-
-                Bàn đang chọn:
-
-                <strong id="selectedTableName">
-
-                    <?php
-                    foreach ($tables as $table) {
-
-                        if ((int)$table['id'] === $selectedTableId) {
-
-                            echo htmlspecialchars($table['table_name']);
-
-                            break;
-                        }
-                    }
-                    ?>
-
-                </strong>
-
-                <span id="selectedTableCapacity"></span>
-
-            </div>
-
-
-            <form method="POST" action="index.php?c=booking&a=customer">
-
-                <input type="hidden" name="action" value="create">
-
-
-                <input
-                    type="hidden"
-                    name="booking_time"
-                    value="<?= htmlspecialchars($bookingTime) ?>"
-                >
-
-
-                <input
-                    type="hidden"
-                    name="guest_count"
-                    value="<?= $guestCount ?>"
-                >
-
-
-                <input
-                    type="hidden"
-                    name="table_id"
-                    id="selectedTableId"
-                    value="<?= $selectedTableId ?>"
-                >
-
-
-                <div class="row g-3">
-
-                    <div class="col-md-6">
-
-                        <label class="form-label">
-
-                            Họ và tên
-                            <span class="text-danger">*</span>
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="full_name"
-                            class="form-control"
-                            value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>"
-                            maxlength="150"
-                            required
-                        >
-
-                    </div>
-
-
-                    <div class="col-md-6">
-
-                        <label class="form-label">
-
-                            Số điện thoại
-                            <span class="text-danger">*</span>
-
-                        </label>
-
-                        <input
-                            type="tel"
-                            name="phone"
-                            class="form-control"
-                            value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>"
-                            pattern="[0-9]{9,11}"
-                            maxlength="11"
-                            required
-                        >
-
-                    </div>
-
-
-                    <div class="col-md-6">
-
-                        <label class="form-label">
-                            Email
-                        </label>
-
-                        <input
-                            type="email"
-                            name="email"
-                            class="form-control"
-                            value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
-                        >
-
-                    </div>
-
-
-                    <div class="col-12">
-
-                        <label class="form-label">
-                            Yêu cầu đặc biệt
-                        </label>
-
-                        <textarea
-                            name="special_request"
-                            class="form-control"
-                            rows="3"
-                            placeholder="Ví dụ: Cần ghế trẻ em, bàn gần cửa sổ..."
-                        ><?= htmlspecialchars($_POST['special_request'] ?? '') ?></textarea>
-
-                    </div>
-
-
-                    <div class="col-12">
-
-                        <button type="submit" class="btn-gold w-100">
-
-                            <i class="bi bi-calendar-check"></i>
-                            Gửi yêu cầu đặt bàn
-
+<div class="container">
+    <div class="cust-light-wrap">
+        <?php if ($success !== ''): ?>
+            <div class="text-center py-4">
+                <span class="badge bg-warning text-dark mb-2">TEST MODE — MÔ PHỎNG ĐẶT CỌC</span>
+                <h3 class="text-success fw-bold">Đã Tạo Phiếu Đặt Bàn Thành Công!</h3>
+                <p class="mb-1">Mã đặt bàn: <strong class="text-primary fs-5"><?= htmlspecialchars($success) ?></strong></p>
+                <h3 class="text-danger fw-bold my-3">Tiền đặt cọc: <?= number_format((float)$depositAmount, 0, ',', '.') ?>đ</h3>
+
+                <?php if (!$isTestPaid): ?>
+                    <form method="POST" action="index.php?c=booking&a=customer">
+                        <input type="hidden" name="action" value="confirm_test_deposit">
+                        <input type="hidden" name="booking_code" value="<?= htmlspecialchars($success) ?>">
+                        <button type="submit" class="btn btn-warning fw-bold px-4 py-2">
+                            Xác nhận đặt cọc mô phỏng (TEST MODE)
                         </button>
-
+                    </form>
+                <?php else: ?>
+                    <div class="alert alert-success d-inline-block px-4">
+                        Đã ghi nhận xác nhận đặt cọc! Lễ tân sẽ giữ bàn cho quý khách.
                     </div>
+                <?php endif; ?>
+                <div class="mt-3">
+                    <a href="index.php?c=booking&a=customer" class="btn btn-outline-secondary btn-sm">← Quay lại trang đặt bàn</a>
+                </div>
+            </div>
+        <?php else: ?>
+            <?php if ($error !== ''): ?>
+                <div class="alert alert-danger py-2"><?= htmlspecialchars($error) ?></div>
+            <?php endif; ?>
 
+            <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom gap-2">
+                <div>
+                    <h3 class="fw-bold mb-1">Đặt Bàn Trực Quan – Floor <?= (int)$selectedFloor ?></h3>
+                    <div class="small text-muted">Chọn ngày, tầng/khu vực và click vào bàn hoặc phòng đang <strong>Trống</strong> để đặt lịch.</div>
                 </div>
 
-            </form>
+                <form method="GET" action="index.php" class="d-flex flex-wrap gap-2" id="custFilterForm">
+                    <input type="hidden" name="c" value="booking">
+                    <input type="hidden" name="a" value="customer">
+                    <input type="date" name="date" class="form-control form-control-sm" style="width:auto;"
+                           min="<?= date('Y-m-d') ?>"
+                           value="<?= htmlspecialchars($selectedDate) ?>"
+                           onchange="document.getElementById('custFilterForm').submit();">
 
-        </div>
+                    <select name="floor" class="form-select form-select-sm" style="width:auto;" onchange="document.getElementById('custFilterForm').submit();">
+                        <?php foreach ($floorsSummary as $fl): ?>
+                            <?php $fNum = (int)$fl['floor_number']; ?>
+                            <option value="<?= $fNum ?>" <?= $selectedFloor === $fNum ? 'selected' : '' ?>>Floor <?= $fNum ?></option>
+                        <?php endforeach; ?>
+                    </select>
 
-    <?php endif; ?>
+                    <select name="area_id" class="form-select form-select-sm" style="width:auto;" onchange="document.getElementById('custFilterForm').submit();">
+                        <option value="0">-- Tất cả khu vực --</option>
+                        <?php foreach ($areas as $ar): ?>
+                            <?php if ($selectedFloor > 0 && (int)$ar['floor_number'] !== $selectedFloor) continue; ?>
+                            <option value="<?= (int)$ar['id'] ?>" <?= $selectedAreaId === (int)$ar['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($ar['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+            </div>
 
+            <!-- Danh sách Bàn tiêu chuẩn -->
+            <div class="cust-grid-3">
+                <?php foreach ($standardTables as $t): ?>
+                    <?php
+                    $eff     = $t['effective_status'] ?? 'Available';
+                    $stClass = $eff === 'Occupied' ? 'st-occupied' : ($eff === 'Reserved' ? 'st-reserved' : 'st-available');
+                    $stText  = $eff === 'Occupied' ? 'Đang dùng' : ($eff === 'Reserved' ? 'Đã đặt' : 'Trống');
+                    $chairs  = renderCustChairsLight((int)$t['capacity']);
+                    $dep     = TableModel::calculateDepositByTable($t, (int)$t['capacity']);
+                    ?>
+                    <div class="cust-table-box <?= $stClass ?>"
+                         onclick="handleCustomerPick(<?= (int)$t['table_id'] ?>, '<?= htmlspecialchars($t['table_name'], ENT_QUOTES) ?>', 'Standard', <?= (int)$t['capacity'] ?>, <?= (float)$dep ?>, '<?= $eff ?>')">
+                        <span class="badge bg-white text-dark border" style="position:absolute;top:10px;right:12px;"><?= (int)$t['capacity'] ?> ghế</span>
+
+                        <div class="c-chair-row">
+                            <?php for ($i = 0; $i < $chairs['top']; $i++): ?><span class="c-chair-bar"></span><?php endfor; ?>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-center gap-3 my-1">
+                            <?php if ($chairs['side'] > 0): ?><span class="c-chair-side"></span><?php endif; ?>
+                            <div>
+                                <div class="fw-bold fs-5 text-dark"><?= htmlspecialchars($t['table_name']) ?></div>
+                                <div class="small text-secondary fw-semibold"><?= $stText ?></div>
+                            </div>
+                            <?php if ($chairs['side'] > 0): ?><span class="c-chair-side"></span><?php endif; ?>
+                        </div>
+                        <div class="c-chair-row">
+                            <?php for ($i = 0; $i < $chairs['bottom']; $i++): ?><span class="c-chair-bar"></span><?php endfor; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <!-- Danh sách Phòng đặc biệt -->
+            <h5 class="fw-bold mb-3 pt-3 border-top">Phòng đặc biệt</h5>
+            <div class="cust-grid-2">
+                <?php foreach ($specialRooms as $rm): ?>
+                    <?php
+                    $rType  = $rm['table_type'] ?? 'VIP';
+                    $isPrem = ($rType === 'Premium');
+                    $minDep = $isPrem ? TableModel::DEPOSIT_PREMIUM : TableModel::DEPOSIT_VIP;
+                    $eff    = $rm['effective_status'] ?? 'Available';
+                    $stText = $eff === 'Occupied' ? 'Đang dùng' : ($eff === 'Reserved' ? 'Đã đặt' : 'Trống');
+                    ?>
+                    <div class="cust-room-box <?= $isPrem ? 'room-president' : 'room-vip' ?> <?= $eff !== 'Available' ? 'is-busy' : '' ?>"
+                         onclick="handleCustomerPick(<?= (int)$rm['table_id'] ?>, '<?= htmlspecialchars($rm['table_name'], ENT_QUOTES) ?>', '<?= $rType ?>', <?= (int)$rm['capacity'] ?>, <?= (float)$minDep ?>, '<?= $eff ?>')">
+                        <span class="badge <?= $eff === 'Available' ? 'bg-success' : 'bg-warning text-dark' ?>" style="position:absolute;top:14px;right:16px;">
+                            <?= $stText ?> • <?= (int)$rm['capacity'] ?> ghế
+                        </span>
+                        <div class="fw-bold fs-4 text-dark text-uppercase mb-1">🚪 <?= htmlspecialchars($rm['table_name']) ?></div>
+                        <div class="fw-bold fs-3" style="color: <?= $isPrem ? '#b45309' : '#7e22ce' ?>;">
+                            <?= number_format($minDep, 0, ',', '.') ?>đ
+                        </div>
+                        <div class="small text-muted fw-semibold">Tiền cọc tối thiểu</div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
 </div>
 
+<!-- POPUP ĐẶT BÀN CHO KHÁCH HÀNG -->
+<div class="modal fade" id="customerBookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-white text-dark">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="custModalTitle">Đặt bàn</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="index.php?c=booking&a=customer">
+                    <input type="hidden" name="action" value="create">
+                    <input type="hidden" name="booking_date" value="<?= htmlspecialchars($selectedDate) ?>">
+                    <input type="hidden" name="table_id" id="custFormTableId">
+
+                    <div class="alert alert-warning py-2 small">
+                        <div>Vị trí: <strong id="custFormTableLabel"></strong></div>
+                        <div>Tiền cọc bắt buộc: <strong id="custFormDepositLabel" class="text-danger fs-6"></strong></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Họ và tên <span class="text-danger">*</span></label>
+                        <input type="text" name="full_name" class="form-control" maxlength="150" required>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Số điện thoại (10-11 số) <span class="text-danger">*</span></label>
+                            <input type="tel" name="phone" class="form-control"
+                                   pattern="0[0-9]{9,10}" minlength="10" maxlength="11"
+                                   placeholder="0901234567"
+                                   title="Phải bắt đầu bằng số 0 và có từ 10-11 chữ số" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Số lượng khách <span class="text-danger">*</span></label>
+                            <input type="number" name="guest_count" id="custFormGuestCount" class="form-control" min="1" max="12" value="4" required>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Email</label>
+                        <input type="email" name="email" class="form-control">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Thời gian đến <span class="text-danger">*</span></label>
+                        <input type="datetime-local" name="booking_time" id="custFormTime" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Yêu cầu đặc biệt</label>
+                        <textarea name="special_request" class="form-control" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Gửi Yêu Cầu Đặt Bàn</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+const CUST_SELECTED_DATE = <?= json_encode($selectedDate) ?>;
 
-    const guestCount = <?= $guestCount ?>;
-
-    const depositElement = document.getElementById('depositAmount');
-
-
-    // TÍNH TIỀN ĐẶT CỌC THEO SỐ LƯỢNG KHÁCH
-    function calculateDeposit(count) {
-
-        if (count <= 4) return 50000;
-
-        if (count <= 8) return 100000;
-
-        if (count <= 12) return 150000;
-
-        if (count <= 20) return 200000;
-
-        return 300000;
+function handleCustomerPick(tableId, tableName, tableType, capacity, deposit, effStatus) {
+    if (effStatus !== 'Available') {
+        alert('Bàn/Phòng [' + tableName + '] đã có khách đặt hoặc đang sử dụng trong ngày này. Quý khách vui lòng chọn bàn đang Trống!');
+        return;
     }
 
+    document.getElementById('custModalTitle').textContent = 'Đặt chỗ: ' + tableName;
+    document.getElementById('custFormTableId').value = tableId;
+    document.getElementById('custFormTableLabel').textContent = tableName + ' (Tối đa ' + capacity + ' ghế)';
+    document.getElementById('custFormDepositLabel').textContent = Number(deposit).toLocaleString('vi-VN') + 'đ';
 
-    if (depositElement) {
+    const guestEl = document.getElementById('custFormGuestCount');
+    guestEl.max = capacity;
+    guestEl.value = Math.min(4, capacity);
 
-        depositElement.textContent =
-            calculateDeposit(guestCount).toLocaleString('vi-VN') + 'đ';
+    document.getElementById('custFormTime').value = CUST_SELECTED_DATE + 'T19:00';
 
-    }
-
-
-    // CHỌN BÀN
-    const tableButtons = document.querySelectorAll('.table-option');
-
-    const customerForm = document.getElementById('customerForm');
-
-    const selectedTableId = document.getElementById('selectedTableId');
-
-    const selectedTableName = document.getElementById('selectedTableName');
-
-    const selectedTableCapacity = document.getElementById('selectedTableCapacity');
-
-
-    tableButtons.forEach(function (button) {
-
-        button.addEventListener('click', function () {
-
-            tableButtons.forEach(function (item) {
-
-                item.classList.remove('selected');
-
-                item.querySelector('.selected-label').style.display = 'none';
-
-            });
-
-
-            this.classList.add('selected');
-
-            this.querySelector('.selected-label').style.display = 'block';
-
-
-            selectedTableId.value = this.dataset.id;
-
-            selectedTableName.textContent = this.dataset.name;
-
-            selectedTableCapacity.textContent =
-                ' - Sức chứa: ' + this.dataset.capacity + ' khách';
-
-
-            customerForm.style.display = 'block';
-
-
-            customerForm.scrollIntoView({
-
-                behavior: 'smooth',
-
-                block: 'start'
-
-            });
-
-        });
-
-    });
-
-});
+    const modal = new bootstrap.Modal(document.getElementById('customerBookingModal'));
+    modal.show();
+}
 </script>

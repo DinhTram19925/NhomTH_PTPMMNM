@@ -1,48 +1,37 @@
 <?php
 require_once __DIR__ . '/../models/StockModel.php';
 
-class Stock_receiptController {
+class Stock_receiptController extends Controller {
     private $stockModel;
 
     public function __construct() {
+        parent::__construct();
         $this->stockModel = new StockModel();
     }
 
     private function checkAccess($allowedRoles) {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        $currentRole = $_SESSION['user']['role_code'] ?? '';
-        
-        if ($currentRole === 'ADMIN') return true;
-        if (!in_array($currentRole, $allowedRoles)) {
-            echo "<script>alert('❌ BẠN KHÔNG CÓ QUYỀN TRUY CẬP CHỨC NĂNG NÀY!'); window.location.href='index.php?c=stock&tab=history';</script>";
-            exit;
-        }
+        $this->requireRole($allowedRoles);
     }
 
     public function create() {
-
         $this->checkAccess(['ADMIN', 'STOCK']);
-        
         $type = $_GET['type'] ?? 'import';
 
         $suppliers = $this->stockModel->getSuppliers('', 'active', 1000, 0);
         $ingredients = $this->stockModel->getIngredients('', '', '', '', 1000, 0);
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            
             $receipt_code = trim($_POST['receipt_code']);
-            $supplier_id  = ($type === 'import') ? ($_POST['supplier_id'] ?? null) : null; 
+            $supplier_id  = ($type === 'import') ? ($_POST['supplier_id'] ?? null) : null;
             $note         = trim($_POST['note']);
-            $created_at   = ($_POST['created_at'] ?? date('Y-m-d')) . ' ' . date('H:i:s'); 
-            
+            $created_at   = ($_POST['created_at'] ?? date('Y-m-d')) . ' ' . date('H:i:s');
+
             $ingredient_ids = $_POST['ingredient_id'] ?? [];
             $quantities     = $_POST['quantity'] ?? [];
             $unit_costs     = $_POST['unit_cost'] ?? [];
 
             $total_amount = 0;
-            $detailsData = [];
+            $detailsData  = [];
 
             for ($i = 0; $i < count($ingredient_ids); $i++) {
                 $ing_id = (int)$ingredient_ids[$i];
@@ -59,11 +48,7 @@ class Stock_receiptController {
                 }
             }
 
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $current_user_id = $_SESSION['user_id'] ?? 2; 
-
+            $current_user_id = (int)($_SESSION['user']['id'] ?? 1);
             $receiptData = [
                 'receipt_code' => $receipt_code,
                 'supplier_id'  => $supplier_id,
@@ -81,32 +66,35 @@ class Stock_receiptController {
                     $isSaved = $this->stockModel->createExportReceipt($receiptData, $detailsData);
                     $msgType = 'xuất kho';
                 }
-                
+
                 if ($isSaved) {
                     echo "<script>
-                        alert('✅ Lưu phiếu $msgType thành công! Kho hàng đã được cập nhật.');
+                        alert('Đã lưu phiếu $msgType thành công! Số lượng tồn kho đã được cập nhật.');
                         window.location.href = 'index.php?c=stock&a=index&tab=dashboard';
                     </script>";
                     exit;
                 } else {
-                    echo "<script>alert('❌ Lỗi hệ thống: Không đủ số lượng trong kho hoặc không thể lưu phiếu lúc này!');</script>";
+                    echo "<script>alert('Không đủ số lượng tồn kho để xuất hoặc lỗi kết nối dữ liệu!');</script>";
                 }
             } else {
-                echo "<script>alert('❌ Vui lòng chọn ít nhất một nguyên vật liệu và nhập số lượng!');</script>";
+                echo "<script>alert('Vui lòng chọn ít nhất một nguyên vật liệu và nhập số lượng hợp lệ!');</script>";
             }
         }
 
+        require_once __DIR__ . '/../views/layouts/header.php';
         if ($type === 'import') {
             require_once __DIR__ . '/../views/stock/stock_receipt/import_form.php';
         } else {
             require_once __DIR__ . '/../views/stock/stock_receipt/export_form.php';
         }
+        require_once __DIR__ . '/../views/layouts/footer.php';
     }
+
     public function show() {
         $this->checkAccess(['ADMIN', 'STOCK', 'CHEF']);
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         $code = isset($_GET['code']) ? trim($_GET['code']) : '';
-        
+
         $receipt = null;
         if ($id > 0) {
             $receipt = $this->stockModel->getReceiptById($id);
@@ -115,32 +103,28 @@ class Stock_receiptController {
         }
 
         if (!$receipt) {
-            echo "<script>alert('Mã phiếu không hợp lệ hoặc không tìm thấy!'); window.location.href='index.php?c=stock&a=index&tab=history';</script>";
+            echo "<script>alert('Mã phiếu không hợp lệ hoặc không tồn tại!'); window.location.href='index.php?c=stock&a=index&tab=history';</script>";
             exit;
         }
 
         $details = $this->stockModel->getReceiptDetails($receipt['id']);
 
+        require_once __DIR__ . '/../views/layouts/header.php';
         if (strpos($receipt['receipt_code'], 'PN') === 0) {
             require_once __DIR__ . '/../views/stock/stock_receipt/show.php';
-            
         } elseif (strpos($receipt['receipt_code'], 'KK') === 0) {
             require_once __DIR__ . '/../views/stock/stock_receipt/show_audit.php';
-            
         } else {
             require_once __DIR__ . '/../views/stock/stock_receipt/show_receipt.php';
         }
+        require_once __DIR__ . '/../views/layouts/footer.php';
     }
+
     public function audit() {
         $this->checkAccess(['ADMIN', 'STOCK']);
         $ingredients = $this->stockModel->getIngredients('', '', '', '', 1000, 0);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            
-            $user_id = $_SESSION['user_id'] ?? 2;
+            $user_id      = (int)($_SESSION['user']['id'] ?? 1);
             $receipt_code = trim($_POST['receipt_code'] ?? 'KK' . date('ymdHis'));
             $note         = trim($_POST['note'] ?? 'Phiếu điều chỉnh kiểm kê định kỳ');
             $created_at   = date('Y-m-d H:i:s');
@@ -149,7 +133,7 @@ class Stock_receiptController {
             $current_qtys   = $_POST['current_qty'] ?? [];
             $actual_qtys    = $_POST['actual_qty'] ?? [];
             $unit_costs     = $_POST['unit_cost'] ?? [];
-            $reasons        = $_POST['reason'] ?? []; 
+            $reasons        = $_POST['reason'] ?? [];
 
             $auditDetails = [];
             for ($i = 0; $i < count($ingredient_ids); $i++) {
@@ -162,59 +146,59 @@ class Stock_receiptController {
                         $auditDetails[] = [
                             'ingredient_id' => (int)$ingredient_ids[$i],
                             'actual_qty'    => $actual_qty,
-                            'difference'    => $diff, 
+                            'difference'    => $diff,
                             'unit_cost'     => (float)($unit_costs[$i] ?? 0),
-                            'reason'        => trim($reasons[$i] ?? '') 
+                            'reason'        => trim($reasons[$i] ?? '')
                         ];
                     }
                 }
             }
 
-            if (!empty($auditDetails)) {$receiptData = [
+            if (!empty($auditDetails)) {
+                $receiptData = [
                     'receipt_code' => $receipt_code,
                     'user_id'      => $user_id,
                     'note'         => $note,
                     'created_at'   => $created_at
                 ];
-
-                $receiptId =$this->stockModel->createAuditReceipt($receiptData,$auditDetails);
-                
+                $receiptId = $this->stockModel->createAuditReceipt($receiptData, $auditDetails);
                 if ($receiptId) {
                     echo "<script>
-                        alert('✅ Kiểm kê thành công! Kho đã được cân bằng thực tế.'); 
+                        alert('Đã hoàn tất kiểm kê! Số lượng tồn kho thực tế đã được cân bằng.');
                         window.location.href='index.php?c=stock_receipt&a=show&id=" . $receiptId . "&from=dashboard';
                     </script>";
                     exit;
                 } else {
-                    echo "<script>alert('❌ Lỗi hệ thống: Không thể lưu phiếu kiểm kê!');</script>";
+                    echo "<script>alert('Không thể lưu phiếu kiểm kê!');</script>";
                 }
             } else {
-                echo "<script>alert('✅ Khớp 100%! Không có chênh lệch nào cần điều chỉnh.'); window.location.href='index.php?c=stock&a=index&tab=dashboard';</script>";
+                echo "<script>alert('Số liệu tồn kho khớp 100%, không có chênh lệch cần điều chỉnh.'); window.location.href='index.php?c=stock&a=index&tab=dashboard';</script>";
                 exit;
             }
         }
 
+        require_once __DIR__ . '/../views/layouts/header.php';
         require_once __DIR__ . '/../views/stock/stock_receipt/audit_form.php';
+        require_once __DIR__ . '/../views/layouts/footer.php';
     }
+
     public function delete() {
         $this->checkAccess(['ADMIN', 'STOCK']);
-
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($id > 0) {
             $receipt = $this->stockModel->getReceiptById($id);
             if ($receipt) {
                 $result = $this->stockModel->deleteReceiptWithRevert($id, $receipt['receipt_type']);
                 if ($result) {
-                    echo "<script>alert('✅ Đã hủy phiếu và hoàn trả số lượng kho thành công!');</script>";
+                    echo "<script>alert('Đã hủy phiếu và hoàn trả số lượng tồn kho thành công!');</script>";
                 } else {
-                    echo "<script>alert('❌ LỖI: Không thể hủy phiếu. Dữ liệu đang được ràng buộc!');</script>";
+                    echo "<script>alert('Không thể hủy phiếu do dữ liệu đang được ràng buộc!');</script>";
                 }
             } else {
-                echo "<script>alert('❌ Không tìm thấy phiếu này!');</script>";
+                echo "<script>alert('Không tìm thấy phiếu kho này!');</script>";
             }
         }
         echo "<script>window.location.href='index.php?c=stock&tab=history';</script>";
         exit;
     }
 }
-?>

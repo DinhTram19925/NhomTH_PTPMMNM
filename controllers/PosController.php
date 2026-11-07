@@ -1,22 +1,15 @@
 <?php
 require_once __DIR__ . '/../models/OrderModel.php';
 
-class PosController {
+class PosController extends Controller {
     private $orderModel;
 
     const LOGIN_URL = 'index.php?c=auth&a=login';
 
     public function __construct() {
+        parent::__construct();
         if (session_status() === PHP_SESSION_NONE) session_start();
         $this->orderModel = new OrderModel();
-    }
-
-    private function json($data, $code = 200) {
-        if (ob_get_length()) ob_clean();
-        http_response_code($code);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        exit;
     }
 
     private function input() {
@@ -24,20 +17,17 @@ class PosController {
         return is_array($d) ? $d : [];
     }
 
-    // Bắt buộc đăng nhập
-    private function guard($api = true) {
-        if (!empty($_SESSION['user']['id'])) return;
-        if ($api) $this->json(['status' => 'error', 'message' => 'Phiên đăng nhập đã hết, vui lòng đăng nhập lại.'], 401);
-        header('Location: ' . self::LOGIN_URL);
-        exit;
+    private function guard(bool $api = true, array $allowedRoles = ['ADMIN', 'WAITER', 'CASHIER', 'CHEF', 'BAR', 'HOSTESS']) {
+        $this->requireRole($allowedRoles, $api);
     }
 
-    private function guardPost() {
-        $this->guard();
+    private function guardPost(array $allowedRoles = ['ADMIN', 'WAITER', 'CASHIER']) {
+        $this->guard(true, $allowedRoles);
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->json(['status' => 'error', 'message' => 'Phương thức không được hỗ trợ.'], 405);
         }
     }
+
     private function uid() { return (int)$_SESSION['user']['id']; }
 
     private function date($v) {
@@ -45,17 +35,38 @@ class PosController {
     }
 
     public function index() {
-        $this->guard(false);
-        require_once __DIR__ . '/../views/pos/index.php';
-    }
+        $this->guard(false, ['ADMIN', 'WAITER', 'CASHIER', 'CHEF', 'BAR', 'HOSTESS']);
 
+        // 1. Tự động sửa lỗi font chữ món ăn làm vỡ JSON JavaScript trên POS
+        $this->db->exec("
+            UPDATE menu_items 
+            SET name = 'Rượu vang đỏ Château Margaux (Ly)', unit = 'Ly' 
+            WHERE name LIKE '%?%' OR item_code = 'RD-WINE01'
+        ");
+
+        // 2. Tự động giải phóng các đơn Open bị rỗng (không có món nào) hoặc bàn bị lệch trạng thái
+        $this->db->exec("
+            UPDATE orders o
+            LEFT JOIN order_details od ON od.order_id = o.id AND od.kds_status <> 'Cancelled'
+            SET o.status = 'Cancelled', o.closed_at = NOW()
+            WHERE o.status = 'Open' AND od.id IS NULL AND o.reservation_id IS NULL
+        ");
+        $this->db->exec("
+            UPDATE dining_tables dt
+            LEFT JOIN orders o ON o.table_id = dt.id AND o.status = 'Open'
+            SET dt.status = IF(o.id IS NULL, 'Available', 'Occupied')
+            WHERE dt.status IN ('Available', 'Occupied')
+        ");
+
+        $this->render('pos/index');
+    }
     public function report() {
-        $this->guard(false);
-        require_once __DIR__ . '/../views/pos/report.php';
+        $this->guard(false, ['ADMIN', 'WAITER', 'CASHIER']);
+        $this->render('pos/report');
     }
 
     public function printBill() {
-        $this->guard(false);
+        $this->guard(false, ['ADMIN', 'WAITER', 'CASHIER']);
         $billData = $this->orderModel->getBillData((int)($_GET['order_id'] ?? 0));
         if (!$billData) {
             echo '<h3>Không tìm thấy dữ liệu hóa đơn!</h3>';
@@ -67,7 +78,7 @@ class PosController {
     }
 
     public function createOrder() {
-        $this->guardPost();
+        $this->guardPost(['ADMIN', 'WAITER', 'CASHIER']);
         $d = $this->input();
         $this->json($this->orderModel->createOrAddOrder(
             (int)($d['table_id'] ?? 0),
@@ -77,7 +88,7 @@ class PosController {
     }
 
     public function cancelItem() {
-        $this->guardPost();
+        $this->guardPost(['ADMIN', 'WAITER', 'CASHIER', 'CHEF']);
         $d = $this->input();
         $this->json($this->orderModel->cancelOrderItem(
             (int)($d['order_detail_id'] ?? 0),
@@ -86,9 +97,8 @@ class PosController {
         ));
     }
 
-    // API Chuyển / Gộp bàn theo Table ID.
     public function transferTable() {
-        $this->guardPost();
+        $this->guardPost(['ADMIN', 'WAITER', 'CASHIER']);
         $d = $this->input();
         $mode = in_array($d['mode'] ?? '', ['transfer', 'merge'], true) ? $d['mode'] : '';
         $this->json($this->orderModel->transferTableByTableId(
@@ -99,34 +109,30 @@ class PosController {
         ));
     }
 
-    // Đóng bàn khi đơn đã hủy hết món (0đ)
     public function closeEmptyOrder() {
-        $this->guardPost();
+        $this->guardPost(['ADMIN', 'WAITER', 'CASHIER']);
         $d = $this->input();
         $this->json($this->orderModel->closeEmptyOrder((int)($d['order_id'] ?? 0), $this->uid()));
     }
 
     public function getKds() {
-        $this->guard();
+        $this->guard(true, ['ADMIN', 'WAITER', 'CASHIER', 'CHEF', 'BAR']);
         $this->json($this->orderModel->getKDSList());
     }
 
-    // Waiting -> Cooking -> Ready -> Served 
     public function updateKds() {
-        $this->guardPost();
+        $this->guardPost(['ADMIN', 'CHEF', 'BAR', 'WAITER', 'CASHIER']);
         $d = $this->input();
         $id = (int)($d['order_detail_id'] ?? 0);
         $status = $d['status'] ?? '';
         if (!$id || !in_array($status, ['Cooking', 'Ready', 'Served'], true)) {
             $this->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ']);
         }
-      
         $this->json($this->orderModel->updateKdsStatus($id, $status, !empty($d['takeaway'])));
     }
 
-    // Xem trước hóa đơn 
     public function previewBill() {
-        $this->guard();
+        $this->guard(true, ['ADMIN', 'WAITER', 'CASHIER']);
         $bill = $this->orderModel->calcBill(
             (int)($_GET['order_id'] ?? 0),
             $_GET['customer_phone'] ?? '',
@@ -136,43 +142,27 @@ class PosController {
         $this->json(['status' => 'success', 'data' => $bill]);
     }
 
-    // Xác nhận đã thu tiền. Số tiền do server tính
     public function checkout() {
-        $this->guardPost();
+        $this->guardPost(['ADMIN', 'WAITER', 'CASHIER']);
         $d = $this->input();
-        $this->json($this->orderModel->checkoutOrder(
-            (int)($d['order_id'] ?? 0),
-            $this->uid(),
-            $d['payment_method'] ?? '',
+        $order_id = (int)($d['order_id'] ?? 0);
+        $cashier_id = $this->uid();
+        $payment_method = $d['payment_method'] ?? 'Cash';
+
+        $result = $this->orderModel->checkoutOrder(
+            $order_id,
+            $cashier_id,
+            $payment_method,
             $d['customer_phone'] ?? '',
             $d['voucher_code'] ?? '',
             $d['transaction_ref'] ?? ''
-        ));
-        if (isset($result['success']) && $result['success'] == true) {
-            $order_id = $data['order_id'];
-            $cashier_id = $data['cashier_id'] ?? ($_SESSION['user']['id'] ?? 2);
-            
-            // 1. Tự động cộng dồn vào "Tổng bán hàng" (Nếu thanh toán bằng tiền mặt)
-            $payment_method = $data['payment_method'] ?? 'cash';
-            // Lấy tổng tiền thanh toán thực tế của đơn hàng từ kết quả trả về hoặc request
-            $total_paid = $result['total_amount'] ?? ($data['total_amount'] ?? 0); 
+        );
 
-            if ($payment_method === 'cash' && $total_paid > 0) {
-                require_once __DIR__ . '/../../models/CashShiftModel.php'; // Điều chỉnh đường dẫn thư mục cho đúng nếu cần
-                $cashModel = new CashShiftModel();
-                $cashModel->recordSaleTransaction($cashier_id, $total_paid, 'sales');
-            }
-
-            // 2. Tự động trừ kho theo định lượng BOM và cảnh báo đỏ
-            require_once __DIR__ . '/../../models/StockModel.php';
-            $stockModel = new StockModel();
-            $bomResult = $stockModel->deductStockByOrder($order_id, $cashier_id);
-        }
+        $this->json($result);
     }
-    // Báo cáo lọc theo ngày
-    
+
     public function getReportData() {
-        $this->guard();
+        $this->guard(true, ['ADMIN', 'WAITER', 'CASHIER']);
         $from = $this->date($_GET['from_date'] ?? null);
         $to   = $this->date($_GET['to_date'] ?? null);
         if (!$from || !$to) $from = $to = null;
@@ -180,9 +170,43 @@ class PosController {
         $this->json([
             'payment_methods' => $this->orderModel->getReportByPaymentMethod($from, $to),
             'time_shifts'     => $this->orderModel->getTimeShiftReport($from, $to),
+            'paid_orders'     => $this->orderModel->getPaidOrdersReport($from, $to),
             'cancel_logs'     => $this->orderModel->getCancelLogsReport($from, $to),
             'move_logs'       => $this->orderModel->getMoveLogsReport($from, $to),
             'shifts'          => $this->orderModel->getShiftRevenueReport($from, $to)
         ]);
+    }
+    public function quickCreateCustomer() {
+        $this->guardPost(['ADMIN', 'WAITER', 'CASHIER', 'HOSTESS']);
+        $d = $this->input();
+
+        require_once __DIR__ . '/../models/CustomerModel.php';
+        $customerModel = new CustomerModel();
+
+        try {
+            $fullName = trim((string)($d['full_name'] ?? ''));
+            $phone    = preg_replace('/\D/', '', (string)($d['phone'] ?? ''));
+            $email    = trim((string)($d['email'] ?? ''));
+
+            $customerModel->saveCustomer([
+                'full_name' => $fullName,
+                'phone'     => $phone,
+                'email'     => $email
+            ]);
+
+            $this->writeAuditLog('CREATE_CUSTOMER_POS', 'CRM & POS', "Tạo nhanh hội viên mới từ POS: {$fullName} ({$phone})", 'INFO');
+
+            $this->json([
+                'status'  => 'success',
+                'message' => 'Đã tạo hồ sơ khách hàng thành công!',
+                'phone'   => $phone,
+                'name'    => $fullName
+            ]);
+        } catch (Throwable $e) {
+            $this->json([
+                'status'  => 'error',
+                'message' => $e->getMessage()
+            ]);
+        }
     }
 }

@@ -1,0 +1,346 @@
+/* ==========================================================================
+   ROYALDINE 5S - UNIFIED ENTERPRISE DESIGN SYSTEM (MISA CUKCUK INSPIRED)
+   Font: Be Vietnam Pro & JetBrains Mono | Theme: Royal Navy, Gold & Slate Light
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
+:root {
+    --rd-navy-950: #0b1120;
+    --rd-navy-900: #0f172a;
+    --rd-navy-800: #1e293b;
+    --rd-navy-700: #334155;
+    --rd-gold-600: #b8860b;
+    --rd-gold-500: #c59b27;
+    --rd-gold-400: #d4af37;
+    --rd-gold-100: #fef9c3;
+    --rd-gold-50:  #fffbeb;
+
+    --rd-bg-body:  #f8fafc;
+    --rd-surface:  #ffffff;
+    --rd-surface-muted: #f1f5f9;
+    --rd-border:   #e2e8f0;
+    --rd-border-strong: #cbd5e1;
+
+    --rd-text-main: #0f172a;
+    --rd-text-secondary: #475569;
+    --rd-text-muted: #64748b;
+
+    --rd-success: #10b981;
+    --rd-success-bg: #ecfdf5;
+    --rd-success-text: #065f46;
+
+    --rd-warning: #f59e0b;
+    --rd-warning-bg: #fffbeb;
+    --rd-warning-text: #92400e;
+
+    --rd-danger: #ef4444;
+    --rd-danger-bg: #fef2f2;
+    --rd-danger-text: #991b1b;
+
+    --rd-info: #3b82f6;
+    --rd-info-bg: #eff6ff;
+    --rd-info-text: #1e40af;
+
+    --rd-neutral: #64748b;
+    --rd-neutral-bg: #f1f5f9;
+    --rd-neutral-text: #334155;
+
+    --rd-radius-sm: 6px;
+    --rd-radius-md: 10px;
+    --rd-radius-lg: 14px;
+    --rd-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    --rd-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--rd-bg-body) !important;
+    color: var(--rd-text-main) !important;
+    font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: 'Be Vietnam Pro', sans-serif !important;
+    color: var(--rd-navy-900);
+    letter-spacing: -0.015em;
+}
+
+code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* ==================== LAYOUT SHELL (SIDEBAR & TOPBAR) ==================== */
+.rd-app-wrapper {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+.rd-sidebar {
+    width: 256px;
+    min-width: 256px;
+    background: var(--rd-navy-900);
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1020;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rd-sidebar .brand-box {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--rd-navy-950);
+}
+
+.rd-sidebar .brand-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--rd-gold-400), var(--rd-gold-600));
+    color: var(--rd-navy-950);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.rd-sidebar .brand-title {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.rd-sidebar .brand-subtitle {
+    color: var(--rd-gold-400);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.rd-sidebar .nav-group-label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    padding: 16px 18px 6px;
+    font-weight: 700;
+}
+
+.rd-sidebar .nav-link-item {
+    color: #cbd5e1;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 18px;
+    margin: 2px 8px;
+    border-radius: var(--rd-radius-sm);
+    font-size: 0.86rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.rd-sidebar .nav-link-item i {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+    color: #94a3b8;
+    transition: color 0.15s ease;
+}
+
+.rd-sidebar .nav-link-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+}
+
+.rd-sidebar .nav-link-item:hover i {
+    color: var(--rd-gold-400);
+}
+
+.rd-sidebar .nav-link-item.active {
+    background: rgba(212, 175, 55, 0.15);
+    color: var(--rd-gold-400);
+    font-weight: 600;
+}
+
+.rd-sidebar .nav-link-item.active i {
+    color: var(--rd-gold-400);
+}
+
+.rd-main-Area {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.rd-top-header {
+    height: 60px;
+    background: var(--rd-surface);
+    border-bottom: 1px solid var(--rd-border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1010;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.rd-content-body {
+    padding: 24px;
+    flex: 1;
+}
+
+/* ==================== UNIFIED PAGE HEADER & CARDS ==================== */
+.rd-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rd-border);
+}
+
+.rd-page-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--rd-navy-900);
+    margin: 0 0 2px 0;
+}
+
+.rd-page-desc {
+    font-size: 0.84rem;
+    color: var(--rd-text-muted);
+    margin: 0;
+}
+
+.card, .rd-card {
+    background: var(--rd-surface);
+    border: 1px solid var(--rd-border) !important;
+    border-radius: var(--rd-radius-md) !important;
+    box-shadow: var(--rd-shadow-sm) !important;
+}
+
+/* ==================== UNIFIED TABLES & FORMS ==================== */
+.table {
+    font-size: 0.875rem;
+    vertical-align: middle;
+    color: var(--rd-text-main);
+}
+
+.table thead th {
+    background-color: #f1f5f9 !important;
+    color: var(--rd-navy-800) !important;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 2px solid var(--rd-border-strong) !important;
+    padding: 11px 12px;
+    white-space: nowrap;
+}
+
+.table tbody td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--rd-border);
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8fafc !important;
+}
+
+.form-control, .form-select {
+    font-family: 'Be Vietnam Pro', sans-serif !important;
+    font-size: 0.875rem;
+    border-color: var(--rd-border-strong);
+    border-radius: var(--rd-radius-sm);
+    padding: 0.48rem 0.75rem;
+    color: var(--rd-text-main);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--rd-gold-500);
+    box-shadow: 0 0 0 3px rgba(197, 155, 39, 0.16);
+}
+
+.form-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--rd-navy-800);
+    margin-bottom: 0.35rem;
+}
+
+/* ==================== UNIFIED BUTTONS & BADGES ==================== */
+.btn {
+    font-family: 'Be Vietnam Pro', sans-serif !important;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: var(--rd-radius-sm);
+    padding: 0.48rem 1rem;
+    transition: all 0.15s ease;
+}
+
+.btn-sm {
+    font-size: 0.78rem;
+    padding: 0.32rem 0.7rem;
+}
+
+.btn-gold, .btn-warning {
+    background-color: var(--rd-gold-400) !important;
+    border-color: var(--rd-gold-500) !important;
+    color: var(--rd-navy-950) !important;
+    font-weight: 700 !important;
+}
+
+.btn-gold:hover, .btn-warning:hover {
+    background-color: var(--rd-gold-500) !important;
+    color: #ffffff !important;
+}
+
+.badge {
+    font-weight: 600;
+    padding: 0.38em 0.7em;
+    border-radius: 6px;
+}
+
+.badge-gold {
+    background-color: var(--rd-gold-100);
+    color: var(--rd-gold-600);
+    border: 1px solid #fde047;
+}
+
+@media (max-width: 991.98px) {
+    .rd-app-wrapper {
+        flex-direction: column;
+    }
+    .rd-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+}

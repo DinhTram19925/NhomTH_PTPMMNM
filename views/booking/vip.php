@@ -1,678 +1,979 @@
 <?php
-$statusLabels = [
-    'Pending' => 'Chờ xác nhận',
-    'Confirmed' => 'Đã xác nhận',
-    'CheckedIn' => 'Đã check-in',
-    'Cancelled' => 'Đã hủy'
+$reservations = $reservations ?? [];
+$tables = $tables ?? [];
+$allTables = $allTables ?? [];
+$floorsSummary = $floorsSummary ?? [];
+$areas = $areas ?? [];
+$statistics = $statistics ?? ['total' => 0, 'available' => 0, 'occupied' => 0, 'reserved' => 0, 'cleaning' => 0];
+$reservedTableIds = $reservedTableIds ?? [];
+$kdsMap = $kdsMap ?? [];
+$error = $error ?? '';
+$success = $success ?? '';
+
+$cleanText = function (?string $text): string {
+    $str = (string)$text;
+    $str = preg_replace('/\s*\([^)]*\)/u', '', $str);
+    $str = preg_replace('/\s*\[[^\]]*\]/u', '', $str);
+    $str = str_replace(['/', '(', ')', '[', ']'], [' · ', '', '', '', ''], $str);
+    return trim($str);
+};
+
+$tierLabels = [
+    'Standard' => 'Hạng Standard · Tích điểm',
+    'Silver'   => 'Hạng Silver · Giảm 3%',
+    'Gold'     => 'Hạng Gold · Giảm 5%',
+    'Diamond'  => 'Hạng Diamond · Giảm 10%'
 ];
 
-$statusColors = [
-    'Pending' => '#d99b32',
-    'Confirmed' => '#168653',
-    'CheckedIn' => '#285fc4',
-    'Cancelled' => '#bd343e'
-];
+$upcomingList = [];
+$pendingList = [];
+$seatedList = [];
+$activeReservationByTable = [];
 
-function bookingEscape($value) {
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+foreach ($reservations as &$res) {
+    $st = $res['status'] ?? 'Pending';
+    $tId = (int)($res['table_id'] ?? 0);
+
+    $kds = ($tId > 0 && isset($kdsMap[$tId])) ? $kdsMap[$tId] : null;
+    $totalDishes   = (int)($kds['total_dishes'] ?? $res['total_dishes'] ?? 0);
+    $waitingDishes = (int)($kds['waiting_dishes'] ?? $res['waiting_dishes'] ?? 0);
+    $cookingDishes = (int)($kds['cooking_dishes'] ?? $res['cooking_dishes'] ?? 0);
+    $readyDishes   = (int)($kds['ready_dishes'] ?? $res['ready_dishes'] ?? 0);
+    $servedDishes  = (int)($kds['served_dishes'] ?? $res['served_dishes'] ?? 0);
+
+    $progressPercent = 15;
+    $progressText = 'Chờ xác nhận giữ bàn';
+    $progressColor = 'amber';
+
+    if ($st === 'Confirmed') {
+        $progressPercent = 35;
+        $progressText = 'Đã xếp bàn · Chờ khách đến';
+        $progressColor = 'blue';
+    } elseif ($st === 'CheckedIn') {
+        if ($totalDishes <= 0) {
+            $progressPercent = 45;
+            $progressText = 'Đã mở POS · Chờ gọi món';
+            $progressColor = 'gold';
+        } elseif ($servedDishes >= $totalDishes) {
+            $progressPercent = 100;
+            $progressText = 'Đã lên đủ ' . $servedDishes . ' món';
+            $progressColor = 'green';
+        } elseif ($readyDishes > 0) {
+            $progressPercent = 85;
+            $progressText = 'Chờ lên ' . $readyDishes . ' món · Đã ra ' . $servedDishes . ' trên ' . $totalDishes . ' món';
+            $progressColor = 'green';
+        } elseif ($cookingDishes > 0) {
+            $progressPercent = 68;
+            $progressText = 'Bếp đang nấu ' . $cookingDishes . ' món · Đã ra ' . $servedDishes . ' trên ' . $totalDishes . ' món';
+            $progressColor = 'gold';
+        } else {
+            $progressPercent = 55;
+            $progressText = 'Chờ bếp nhận ' . $waitingDishes . ' món';
+            $progressColor = 'amber';
+        }
+    } elseif ($st === 'Cancelled') {
+        $progressPercent = 0;
+        $progressText = 'Đã hủy đặt bàn';
+        $progressColor = 'red';
+    }
+
+    $res['progress_percent'] = $progressPercent;
+    $res['progress_text'] = $progressText;
+    $res['progress_color'] = $progressColor;
+
+    if ($st === 'Confirmed') {
+        $upcomingList[] = $res;
+        if ($tId > 0 && !isset($activeReservationByTable[$tId])) {
+            $activeReservationByTable[$tId] = $res;
+        }
+    } elseif ($st === 'Pending') {
+        $pendingList[] = $res;
+        if ($tId > 0 && !isset($activeReservationByTable[$tId])) {
+            $activeReservationByTable[$tId] = $res;
+        }
+    } elseif ($st === 'CheckedIn') {
+        $seatedList[] = $res;
+        if ($tId > 0) {
+            $activeReservationByTable[$tId] = $res;
+        }
+    }
 }
+unset($res);
+
+$tablesByArea = [];
+foreach ($allTables as $tb) {
+    if (empty($tb['table_id'])) continue;
+    $aId = (int)$tb['area_id'];
+    $flNum = (int)($tb['floor_number'] ?? 1);
+    if (!isset($tablesByArea[$aId])) {
+        $tablesByArea[$aId] = [
+            'area_id'      => $aId,
+            'floor_number' => $flNum,
+            'area_name'    => $cleanText($tb['area_name'] ?? ''),
+            'surcharge'    => (float)($tb['surcharge_percent'] ?? 0),
+            'tables'       => []
+        ];
+    }
+    $tablesByArea[$aId]['tables'][] = $tb;
+}
+
+$defaultBookingTime = date('Y-m-d\TH:i', strtotime('+2 hours'));
 ?>
 
 <style>
-/* ROYALDINE 5S - VIP BOOKING */
-
-.rd-booking {
-    --gold: #d8b66c;
-    --gold-light: #f3dfaa;
-    --bg: #111925;
-    --panel: #1a2737;
-    --panel2: #202e40;
-    --border: #354458;
-    --text: #f4f5f7;
-    --muted: #a4b0c1;
-
-    box-sizing: border-box;
-    margin: 0;
-    padding: 28px;
-    min-height: 700px;
-    color: var(--text);
-    background:
-        radial-gradient(
-            ellipse at 90% 0%,
-            #29374a 0%,
-            transparent 38%
-        ),
-        var(--bg);
-    border-radius: 14px;
-    font-family: "Segoe UI", Arial, sans-serif;
+:root {
+    --vp-navy: #17243b;
+    --vp-navy-dark: #0f172a;
+    --vp-gold: #c69b45;
+    --vp-gold-soft: #fffbeb;
+    --vp-bg: #f8fafc;
+    --vp-card: #ffffff;
+    --vp-border: #e2e8f0;
+    --vp-text: #1e293b;
+    --vp-muted: #64748b;
+    --vp-green: #15803d;
+    --vp-green-bg: #dcfce7;
+    --vp-blue: #1d4ed8;
+    --vp-blue-bg: #dbeafe;
+    --vp-amber: #b45309;
+    --vp-amber-bg: #fef3c7;
+    --vp-red: #b91c1c;
+    --vp-red-bg: #fee2e2;
 }
 
-.rd-booking *,
-.rd-booking *::before,
-.rd-booking *::after {
-    box-sizing: border-box;
+.vp-workspace {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    background: var(--vp-bg);
+    color: var(--vp-text);
+    padding: 14px 20px 38px;
 }
 
-.rd-booking h2 {
-    margin: 0 0 8px;
-    color: var(--gold-light);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(27px, 3vw, 36px);
-    font-weight: 500;
-}
-
-.rd-booking h3 {
-    margin: 0 0 18px;
-    color: var(--gold-light);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 21px;
-    font-weight: 500;
-}
-
-.rd-booking .booking-subtitle {
-    margin: 0 0 25px;
-    color: var(--muted);
+.vp-flash {
+    padding: 10px 16px;
+    border-radius: 8px;
     font-size: 13px;
-    line-height: 1.7;
+    font-weight: 700;
+    margin-bottom: 14px;
 }
+.vp-flash-ok { background: var(--vp-green-bg); color: var(--vp-green); border: 1px solid #86efac; }
+.vp-flash-err { background: var(--vp-red-bg); color: var(--vp-red); border: 1px solid #fca5a5; }
 
-/* CARD */
-
-.rd-booking .booking-card {
-    margin-bottom: 22px;
-    padding: 22px;
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    background: linear-gradient(145deg, #202e40, #192434);
-    box-shadow: 0 10px 28px #00000018;
-}
-
-/* FORM */
-
-.rd-booking .booking-form {
+/* Main Split Grid: Vertical Progress Left + Horizontal Map Right */
+.vp-shell {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 345px 1fr;
     gap: 16px;
+    align-items: start;
+    margin-bottom: 18px;
+}
+@media (max-width: 1150px) {
+    .vp-shell { grid-template-columns: 1fr; }
 }
 
-.rd-booking .booking-field {
+/* LEFT VERTICAL SIDEBAR */
+.vp-vertical-panel {
+    background: var(--vp-card);
+    border: 1px solid var(--vp-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
     display: flex;
-    min-width: 0;
     flex-direction: column;
-    gap: 8px;
+    max-height: calc(100vh - 110px);
+    position: sticky;
+    top: 14px;
 }
 
-.rd-booking .booking-field label {
-    color: #d8dfe8;
-    font-size: 12px;
-    font-weight: 600;
+.vp-v-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--vp-border);
+    background: #ffffff;
 }
-
-.rd-booking .booking-field input,
-.rd-booking .booking-field select,
-.rd-booking .booking-field textarea {
-    width: 100%;
-    min-width: 0;
-    padding: 11px 12px;
-    border: 1px solid #46566c;
-    border-radius: 8px;
-    outline: none;
-    color: var(--text);
-    background: #121d2b;
-    font: 13px "Segoe UI", Arial, sans-serif;
-    color-scheme: dark;
-    transition: .2s;
-}
-
-.rd-booking .booking-field input:focus,
-.rd-booking .booking-field select:focus,
-.rd-booking .booking-field textarea:focus {
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px #d8b66c18;
-}
-
-.rd-booking .booking-field input::placeholder,
-.rd-booking .booking-field textarea::placeholder {
-    color: #8492a5;
-}
-
-.rd-booking .booking-field textarea {
-    min-height: 88px;
-    resize: vertical;
-}
-
-/* BUTTON */
-
-.rd-booking .booking-submit {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 42px;
-    padding: 11px 20px;
-    border: 1px solid #e7cd8c;
-    border-radius: 8px;
-    color: #171b21;
-    background: linear-gradient(135deg, #f1dba3, #c8a458);
-    font-size: 13px;
-    font-weight: 700;
+.vp-v-tab {
+    padding: 13px 6px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
     cursor: pointer;
-    transition: .2s;
+    transition: 0.15s;
+}
+.vp-v-tab:hover { background: #f8fafc; }
+.vp-v-tab.active {
+    border-bottom-color: var(--vp-navy);
+    background: #f8fafc;
+}
+.vp-v-tab-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--vp-muted);
+    margin-bottom: 2px;
+}
+.vp-v-tab.active .vp-v-tab-label { color: var(--vp-navy); }
+.vp-v-tab-num {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--vp-navy);
 }
 
-.rd-booking .booking-submit:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.08);
+.vp-v-search {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--vp-border);
+    background: #f8fafc;
 }
-
-/* NOTIFICATION */
-
-.rd-booking .booking-success,
-.rd-booking .booking-error {
-    margin-bottom: 16px;
-    padding: 13px 15px;
+.vp-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
     font-size: 13px;
+    font-family: inherit;
+    color: var(--vp-text);
+    background: #ffffff;
+}
+.vp-input:focus {
+    outline: none;
+    border-color: var(--vp-gold);
+    box-shadow: 0 0 0 3px rgba(198, 155, 69, 0.15);
 }
 
-.rd-booking .booking-success {
-    border: 1px solid #287b61;
-    color: #9ce8c7;
-    background: #164333;
+.vp-v-list {
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
 }
 
-.rd-booking .booking-error {
-    border: 1px solid #8e424b;
-    color: #ffc1c6;
-    background: #49252d;
+.vp-res-card {
+    background: #ffffff;
+    border: 1px solid var(--vp-border);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    transition: 0.15s;
 }
-
-/* BOOKING TABLE */
-
-.rd-booking .booking-table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 9px;
+.vp-res-card:hover,
+.vp-res-card.active {
+    border-color: var(--vp-gold);
+    background: var(--vp-gold-soft);
+    box-shadow: 0 4px 12px rgba(198, 155, 69, 0.12);
 }
-
-.rd-booking .booking-table {
-    width: 100%;
-    min-width: 900px;
-    border-collapse: collapse;
-    background: #182434;
+.vp-res-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--vp-navy);
+    margin-bottom: 4px;
 }
-
-.rd-booking .booking-table th,
-.rd-booking .booking-table td {
-    padding: 13px 12px;
-    border-bottom: 1px solid var(--border);
-    color: #dce3ec;
-    text-align: left;
+.vp-res-sub {
+    display: flex;
+    justify-content: space-between;
     font-size: 12px;
-    white-space: nowrap;
+    font-weight: 600;
+    color: var(--vp-muted);
+    margin-bottom: 8px;
 }
-
-.rd-booking .booking-table th {
-    color: var(--gold-light);
-    background: #202e40;
+.vp-prog-label {
+    display: flex;
+    justify-content: space-between;
     font-size: 11px;
     font-weight: 700;
+    color: var(--vp-navy);
+    margin-bottom: 4px;
 }
-
-.rd-booking .booking-table tbody tr {
-    transition: background .2s;
+.vp-prog-track {
+    width: 100%;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 9px;
 }
-
-.rd-booking .booking-table tbody tr:hover {
-    background: #ffffff08;
+.vp-prog-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.25s ease;
 }
+.vp-prog-fill.green { background: var(--vp-green); }
+.vp-prog-fill.blue  { background: var(--vp-blue); }
+.vp-prog-fill.gold  { background: var(--vp-gold); }
+.vp-prog-fill.amber { background: var(--vp-amber); }
+.vp-prog-fill.red   { background: var(--vp-red); }
 
-.rd-booking .booking-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.rd-booking .booking-table strong {
-    color: var(--gold-light);
-}
-
-/* STATUS */
-
-.rd-booking .booking-status {
-    display: inline-block;
-    padding: 6px 10px;
-    border: 1px solid #ffffff20;
-    border-radius: 20px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-/* ACTIONS */
-
-.rd-booking .booking-actions {
+.vp-res-foot {
     display: flex;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed #e2e8f0;
+    padding-top: 8px;
     gap: 6px;
 }
-
-.rd-booking .booking-actions form {
-    margin: 0;
+.vp-tier-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #334155;
 }
-
-.rd-booking .booking-actions button {
-    min-height: 30px;
-    padding: 7px 10px;
-    border: 1px solid transparent;
+.vp-mini-btn {
+    padding: 5px 10px;
     border-radius: 6px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 800;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: var(--vp-navy);
     cursor: pointer;
-    transition: .2s;
-}
-
-.rd-booking .booking-actions button:hover {
-    filter: brightness(1.12);
-    transform: translateY(-1px);
-}
-
-.rd-booking .booking-confirm {
-    background: #168653;
-}
-
-.rd-booking .booking-checkin {
-    background: #285fc4;
-}
-
-.rd-booking .booking-cancel {
-    background: #bd343e;
-}
-
-/* BACK LINK */
-
-.rd-booking > a {
-    display: inline-flex;
-    margin-top: 2px;
-    color: var(--gold);
-    font-size: 13px;
     text-decoration: none;
 }
+.vp-mini-btn.navy { background: var(--vp-navy); color: #e5bd69; border-color: var(--vp-navy); }
+.vp-mini-btn.gold { background: var(--vp-gold); color: var(--vp-navy); border-color: #b38936; }
+.vp-mini-btn.green { background: var(--vp-green); color: #ffffff; border-color: var(--vp-green); }
+.vp-mini-btn.danger { color: var(--vp-red); border-color: #fca5a5; background: #fff5f5; }
 
-.rd-booking > a:hover {
-    color: var(--gold-light);
+/* RIGHT STAGE: HORIZONTAL BARS & FLOOR PLAN */
+.vp-right-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.vp-hbar {
+    background: var(--vp-card);
+    border: 1px solid var(--vp-border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+}
+.vp-hgroup {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.vp-btn {
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 800;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: var(--vp-navy);
+    cursor: pointer;
+    text-decoration: none;
+    transition: 0.15s;
+}
+.vp-btn:hover {
+    border-color: var(--vp-gold);
+    background: var(--vp-gold-soft);
+}
+.vp-btn.navy { background: var(--vp-navy); color: #e5bd69; border-color: var(--vp-navy); }
+.vp-btn.gold { background: var(--vp-gold); color: var(--vp-navy); border-color: #b38936; }
+
+.vp-pill {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    border: 1px solid transparent;
+    background: #f1f5f9;
+    color: #475569;
+    cursor: pointer;
+}
+.vp-pill.active {
+    background: var(--vp-blue-bg);
+    color: var(--vp-blue);
+    border-color: #93c5fd;
 }
 
-/* RESPONSIVE */
-
-@media (max-width: 1050px) {
-    .rd-booking .booking-form {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+.vp-floor-canvas {
+    background: #ffffff;
+    border: 1px solid var(--vp-border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.03);
 }
+.vp-room-box {
+    border: 5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 18px;
+    background: #fcfcfd;
+}
+.vp-room-box:last-child { margin-bottom: 0; }
+.vp-room-tag {
+    display: inline-flex;
+    gap: 8px;
+    background: var(--vp-navy);
+    color: #e5bd69;
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+}
+.vp-table-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 18px;
+}
+.vp-table-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+.vp-table-unit:hover { transform: translateY(-3px); }
+.vp-table-unit.highlight-focus .vp-table-surface {
+    outline: 3px solid var(--vp-gold);
+    box-shadow: 0 0 0 5px rgba(198, 155, 69, 0.25);
+}
+.vp-chairs {
+    display: flex;
+    gap: 6px;
+    margin: 3px 0;
+}
+.vp-chair {
+    width: 22px;
+    height: 6px;
+    border-radius: 4px;
+    background: #cbd5e1;
+}
+.vp-table-surface {
+    width: 100%;
+    min-height: 98px;
+    border-radius: 10px;
+    padding: 10px;
+    border: 2px solid #cbd5e1;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    text-align: center;
+}
+.vp-table-unit.st-Reserved .vp-table-surface { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+.vp-table-unit.st-Reserved .vp-chair { background: #fcd34d; }
+.vp-table-unit.st-Occupied .vp-table-surface { background: #eff6ff; border-color: #60a5fa; color: #1e3a8a; }
+.vp-table-unit.st-Occupied .vp-chair { background: #93c5fd; }
+.vp-table-unit.st-Cleaning .vp-table-surface { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
 
-@media (max-width: 700px) {
-    .rd-booking {
-        padding: 16px;
-    }
-
-    .rd-booking .booking-card {
-        padding: 15px;
-    }
-
-    .rd-booking .booking-form {
-        grid-template-columns: 1fr;
-    }
+/* Modal */
+.vp-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.58);
+    z-index: 1060;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.vp-modal-backdrop.show { display: flex; }
+.vp-modal-dialog {
+    background: #ffffff;
+    border-radius: 14px;
+    width: min(680px, 100%);
+    overflow: hidden;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+}
+.vp-modal-header {
+    background: var(--vp-navy);
+    color: #e5bd69;
+    padding: 14px 22px;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--vp-gold);
+}
+.vp-modal-body { padding: 22px; }
+.vp-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+@media (max-width: 640px) {
+    .vp-form-grid { grid-template-columns: 1fr; }
+}
+.vp-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--vp-navy);
+    margin-bottom: 5px;
 }
 </style>
 
-<div class="rd-booking">
+<div class="vp-workspace">
 
-    <!-- TIÊU ĐỀ -->
-    <h2>Đặt bàn VIP</h2>
-
-    <p class="booking-subtitle">
-        Quản lý thông tin khách hàng và lịch đặt bàn nhà hàng RoyalDine 5S.
-    </p>
-
-    <!-- THÔNG BÁO -->
-    <?php if (!empty($error)): ?>
-        <div class="booking-error">
-            <?= bookingEscape($error) ?>
-        </div>
+    <?php if ($error !== ''): ?>
+        <div class="vp-flash vp-flash-err"><?= htmlspecialchars($cleanText($error)) ?></div>
     <?php endif; ?>
 
-    <?php if (!empty($success)): ?>
-        <div class="booking-success">
-            <?= bookingEscape($success) ?>
-        </div>
+    <?php if ($success !== ''): ?>
+        <div class="vp-flash vp-flash-ok"><?= htmlspecialchars($cleanText($success)) ?></div>
     <?php endif; ?>
 
-    <!-- FORM TẠO ĐẶT BÀN -->
-    <section class="booking-card">
+    <div class="vp-shell">
 
-        <h3>＋ Tạo đặt bàn mới</h3>
-
-        <form method="POST" class="booking-form">
-
-            <input type="hidden" name="action" value="create">
-
-            <div class="booking-field">
-                <label>Họ tên khách hàng *</label>
-                <input
-                    type="text"
-                    name="full_name"
-                    maxlength="100"
-                    required
-                    placeholder="Nhập họ tên khách">
-            </div>
-
-            <div class="booking-field">
-                <label>Số điện thoại *</label>
-                <input
-                    type="tel"
-                    name="phone"
-                    required
-                    pattern="[0-9]{9,11}"
-                    placeholder="Nhập số điện thoại">
-            </div>
-
-            <div class="booking-field">
-                <label>Email</label>
-                <input
-                    type="email"
-                    name="email"
-                    maxlength="100"
-                    placeholder="Email khách hàng">
-            </div>
-
-            <div class="booking-field">
-                <label>Chọn bàn *</label>
-
-                <select name="table_id" required>
-                    <option value="">-- Chọn bàn --</option>
-
-                    <?php foreach ($tables as $table): ?>
-                        <option
-                            value="<?= (int)$table['id'] ?>"
-                            <?= (
-                                isset($_GET['table_id'])
-                                && (int)$_GET['table_id'] === (int)$table['id']
-                            ) ? 'selected' : '' ?>>
-
-                            <?= bookingEscape($table['table_name']) ?>
-                            -
-                            <?= bookingEscape($table['area_name']) ?>
-                            (<?= (int)$table['capacity'] ?> khách)
-
-                        </option>
-                    <?php endforeach; ?>
-
-                </select>
-            </div>
-
-            <div class="booking-field">
-                <label>Ngày giờ đặt *</label>
-
-                <input
-                    type="datetime-local"
-                    name="booking_time"
-                    min="<?= date('Y-m-d\TH:i') ?>"
-                    required>
-            </div>
-
-            <div class="booking-field">
-                <label>Số lượng khách *</label>
-
-                <input
-                    type="number"
-                    name="guest_count"
-                    min="1"
-                    max="100"
-                    value="2"
-                    required>
-            </div>
-
-            <div class="booking-field">
-                <label>Tiền đặt cọc (VNĐ)</label>
-
-                <input
-                    type="number"
-                    name="deposit_amount"
-                    min="0"
-                    step="1000"
-                    value="0">
-            </div>
-
-            <div class="booking-field">
-                <label>Yêu cầu đặc biệt</label>
-
-                <textarea
-                    name="special_request"
-                    placeholder="Sinh nhật, trang trí bàn, yêu cầu riêng..."></textarea>
-            </div>
-
-            <div style="grid-column:1/-1">
-                <button class="booking-submit" type="submit">
-                    ＋ Tạo đặt bàn
+        <!-- THANH DỌC BÊN TRÁI: TIẾN ĐỘ ĐẶT BÀN & PHỤC VỤ TỪ POS KDS -->
+        <aside class="vp-vertical-panel">
+            <div class="vp-v-tabs" id="vStatusTabs">
+                <button type="button" class="vp-v-tab active" data-tab="ALL">
+                    <span class="vp-v-tab-label">Tất cả</span>
+                    <span class="vp-v-tab-num"><?= count($upcomingList) + count($pendingList) + count($seatedList) ?></span>
+                </button>
+                <button type="button" class="vp-v-tab" data-tab="UPCOMING">
+                    <span class="vp-v-tab-label">Sắp đến</span>
+                    <span class="vp-v-tab-num"><?= count($upcomingList) + count($pendingList) ?></span>
+                </button>
+                <button type="button" class="vp-v-tab" data-tab="SEATED">
+                    <span class="vp-v-tab-label">Đang phục vụ</span>
+                    <span class="vp-v-tab-num"><?= count($seatedList) ?></span>
                 </button>
             </div>
 
-        </form>
-    </section>
+            <div class="vp-v-search">
+                <input type="text" id="vSearchInput" class="vp-input" placeholder="Tìm khách, số điện thoại, tên bàn...">
+            </div>
 
-    <!-- DANH SÁCH ĐẶT BÀN -->
-    <section class="booking-card">
+            <div class="vp-v-list" id="vReservationList">
+                <?php if (empty($reservations)): ?>
+                    <div style="text-align:center; padding: 36px 14px; color: var(--vp-muted); font-size: 13px;">
+                        Chưa có phiếu đặt bàn
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($reservations as $r): ?>
+                        <?php
+                        $st = $r['status'] ?? 'Pending';
+                        if ($st === 'Cancelled') continue;
+                        $tabGroup = ($st === 'CheckedIn') ? 'SEATED' : 'UPCOMING';
+                        $tId = (int)($r['table_id'] ?? 0);
+                        $tier = $r['tier'] ?? 'Standard';
+                        $tierText = $tierLabels[$tier] ?? $tierLabels['Standard'];
+                        $timeFormatted = date('H:i · d-m', strtotime($r['booking_time']));
+                        $cleanArea = $cleanText($r['area_name'] ?? '');
+                        $searchBlob = mb_strtolower(($r['full_name'] ?? '') . ' ' . ($r['phone'] ?? '') . ' ' . ($r['table_name'] ?? '') . ' ' . ($r['booking_code'] ?? ''), 'UTF-8');
+                        ?>
+                        <div class="vp-res-card"
+                             data-tab="<?= $tabGroup ?>"
+                             data-table-id="<?= $tId ?>"
+                             data-search="<?= htmlspecialchars($searchBlob) ?>"
+                             onclick="focusTableOnMap(<?= $tId ?>, this)">
 
-        <h3>Danh sách đặt bàn</h3>
+                            <div class="vp-res-head">
+                                <span><?= htmlspecialchars($r['full_name']) ?></span>
+                                <span><?= $timeFormatted ?></span>
+                            </div>
 
-        <div class="booking-table-wrap">
+                            <div class="vp-res-sub">
+                                <span><?= htmlspecialchars($r['table_name'] ?? 'Chưa xếp bàn') ?> · <?= htmlspecialchars($cleanArea) ?></span>
+                                <span><?= (int)$r['guest_count'] ?> khách</span>
+                            </div>
 
-            <table class="booking-table">
+                            <div class="vp-prog-label">
+                                <span><?= htmlspecialchars($r['progress_text']) ?></span>
+                                <span><?= (int)$r['progress_percent'] ?>%</span>
+                            </div>
 
-                <thead>
-                    <tr>
-                        <th>Mã đặt bàn</th>
-                        <th>Khách hàng</th>
-                        <th>Điện thoại</th>
-                        <th>Bàn</th>
-                        <th>Thời gian</th>
-                        <th>Số khách</th>
-                       <th>Tiền cọc</th>
-                       <th>Yêu cầu đặc biệt</th>
-                       <th>Trạng thái</th>
-                       <th>Thao tác</th>
-                    </tr>
-                </thead>
+                            <div class="vp-prog-track">
+                                <div class="vp-prog-fill <?= htmlspecialchars($r['progress_color']) ?>"
+                                     style="width: <?= (int)$r['progress_percent'] ?>%;"></div>
+                            </div>
 
-                <tbody>
+                            <div class="vp-res-foot" onclick="event.stopPropagation();">
+                                <span class="vp-tier-tag"><?= htmlspecialchars($tierText) ?></span>
 
-                    <?php if (empty($reservations)): ?>
+                                <div style="display:flex; gap:5px;">
+                                    <?php if ($st === 'Pending'): ?>
+                                        <form method="POST" action="index.php?c=booking&a=vip" style="display:inline;">
+                                            <input type="hidden" name="return_page" value="vip">
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                            <input type="hidden" name="status" value="Confirmed">
+                                            <button type="submit" class="vp-mini-btn green">Xác nhận</button>
+                                        </form>
+                                        <form method="POST" action="index.php?c=booking&a=vip" style="display:inline;">
+                                            <input type="hidden" name="return_page" value="vip">
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                            <input type="hidden" name="status" value="Cancelled">
+                                            <button type="submit" class="vp-mini-btn danger">Hủy</button>
+                                        </form>
+                                    <?php elseif ($st === 'Confirmed'): ?>
+                                        <form method="POST" action="index.php?c=booking&a=vip" style="display:inline;">
+                                            <input type="hidden" name="return_page" value="vip">
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                            <input type="hidden" name="status" value="CheckedIn">
+                                            <button type="submit" class="vp-mini-btn gold">Check-in POS</button>
+                                        </form>
+                                        <form method="POST" action="index.php?c=booking&a=vip" style="display:inline;">
+                                            <input type="hidden" name="return_page" value="vip">
+                                            <input type="hidden" name="action" value="status">
+                                            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                            <input type="hidden" name="status" value="Cancelled">
+                                            <button type="submit" class="vp-mini-btn danger">Hủy</button>
+                                        </form>
+                                    <?php elseif ($st === 'CheckedIn'): ?>
+                                        <a href="index.php?c=pos&a=index" class="vp-mini-btn navy">Mở POS</a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </aside>
 
-                        <tr>
-                            <td colspan="10" style="text-align:center">
-                                Chưa có dữ liệu đặt bàn.
-                            </td>
-                        </tr>
+        <!-- KHUNG BÊN PHẢI: THANH NGANG TẦNG, KHU VỰC & SƠ ĐỒ BÀN -->
+        <section class="vp-right-stage">
 
-                    <?php else: ?>
+            <!-- Thanh ngang 1: Nút chức năng + Lọc Tầng + Lọc Khu vực -->
+            <div class="vp-hbar">
+                <div class="vp-hgroup">
+                    <button type="button" class="vp-btn gold" onclick="openBookingModal(0)">Tạo phiếu đặt bàn mới</button>
+                    <a href="index.php?c=pos&a=index" class="vp-btn">Khách vãng lai</a>
+                    <a href="index.php?c=booking&a=index" class="vp-btn">Sơ đồ bàn</a>
+                    <a href="index.php?c=booking&a=report" class="vp-btn navy">Báo cáo đặt bàn</a>
+                </div>
 
-                        <?php foreach ($reservations as $reservation): ?>
+                <div class="vp-hgroup" id="hFloorTabs">
+                    <button type="button" class="vp-pill active" data-floor="ALL">Tất cả tầng</button>
+                    <?php foreach ($floorsSummary as $fl): ?>
+                        <?php $flNum = (int)$fl['floor_number']; ?>
+                        <button type="button" class="vp-pill" data-floor="<?= $flNum ?>">
+                            Tầng <?= $flNum ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
 
-                            <?php
-                            $status = $reservation['status'];
-                            $color = $statusColors[$status] ?? '#64748b';
-                            ?>
+                <div class="vp-hgroup" id="hAreaTabs">
+                    <button type="button" class="vp-pill active" data-area="ALL">Tất cả khu vực</button>
+                    <?php foreach ($tablesByArea as $aId => $areaInfo): ?>
+                        <button type="button" class="vp-pill" data-area="<?= (int)$aId ?>">
+                            <?= htmlspecialchars($areaInfo['area_name']) ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
 
-                            <tr>
+            <!-- Sơ đồ bàn và phòng lấy từ Sơ đồ bàn -->
+            <div class="vp-floor-canvas">
+                <?php foreach ($tablesByArea as $aId => $areaInfo): ?>
+                    <div class="vp-room-box area-room-section"
+                         data-area-id="<?= (int)$aId ?>"
+                         data-floor-num="<?= (int)$areaInfo['floor_number'] ?>">
+                        <div class="vp-room-tag">
+                            <span>Tầng <?= (int)$areaInfo['floor_number'] ?> · <?= htmlspecialchars($areaInfo['area_name']) ?></span>
+                            <?php if ($areaInfo['surcharge'] > 0): ?>
+                                <span>· Phụ thu <?= number_format($areaInfo['surcharge'], 0) ?>%</span>
+                            <?php endif; ?>
+                        </div>
 
-                                <td>
-                                    <strong>
-                                        <?= bookingEscape($reservation['booking_code']) ?>
-                                    </strong>
-                                </td>
+                        <div class="vp-table-grid">
+                            <?php foreach ($areaInfo['tables'] as $tb): ?>
+                                <?php
+                                $tId = (int)$tb['table_id'];
+                                $rawStatus = $tb['status'] ?? 'Available';
+                                if ($rawStatus === 'Available' && in_array($tId, $reservedTableIds, true)) {
+                                    $rawStatus = 'Reserved';
+                                }
 
-                                <td>
-                                    <?= bookingEscape($reservation['full_name']) ?>
-                                </td>
+                                $cap = max(2, (int)$tb['capacity']);
+                                $topChairs = min(4, (int)ceil($cap / 2));
+                                $botChairs = min(4, (int)floor($cap / 2));
 
-                                <td>
-                                    <?= bookingEscape($reservation['phone']) ?>
-                                </td>
+                                $kdsInfo = $kdsMap[$tId] ?? null;
+                                $linkedRes = $activeReservationByTable[$tId] ?? null;
 
-                                <td>
-                                    <?= bookingEscape($reservation['table_name'] ?? 'Chưa chọn') ?>
-                                </td>
+                                $statusLabelVi = match ($rawStatus) {
+                                    'Occupied' => 'Đang phục vụ',
+                                    'Reserved' => 'Đã đặt trước',
+                                    'Cleaning' => 'Đang dọn',
+                                    default    => 'Bàn trống'
+                                };
 
-                                <td>
-                                    <?= bookingEscape($reservation['booking_time']) ?>
-                                </td>
-<!-- Số khách -->
-<td>
-    <?= (int)($reservation['guest_count'] ?? 0) ?>
-</td>
+                                $kdsTextLine = $statusLabelVi;
+                                if ($rawStatus === 'Occupied' && $kdsInfo) {
+                                    $totD = (int)$kdsInfo['total_dishes'];
+                                    $srvD = (int)$kdsInfo['served_dishes'];
+                                    $ckD  = (int)$kdsInfo['cooking_dishes'];
+                                    $rdD  = (int)$kdsInfo['ready_dishes'];
+                                    if ($totD === 0) {
+                                        $kdsTextLine = 'Chờ gọi món';
+                                    } elseif ($srvD >= $totD) {
+                                        $kdsTextLine = 'Đã lên đủ ' . $srvD . ' món';
+                                    } elseif ($rdD > 0) {
+                                        $kdsTextLine = 'Chờ lên ' . $rdD . ' món · Đã ra ' . $srvD . ' trên ' . $totD;
+                                    } elseif ($ckD > 0) {
+                                        $kdsTextLine = 'Đang nấu ' . $ckD . ' món · Đã ra ' . $srvD . ' trên ' . $totD;
+                                    } else {
+                                        $kdsTextLine = 'Đã ra ' . $srvD . ' trên ' . $totD . ' món';
+                                    }
+                                } elseif ($linkedRes && $rawStatus === 'Reserved') {
+                                    $kdsTextLine = date('H:i', strtotime($linkedRes['booking_time'])) . ' · ' . $linkedRes['full_name'];
+                                }
+                                ?>
+                                <div class="vp-table-unit st-<?= htmlspecialchars($rawStatus) ?> map-table-node"
+                                     id="map_table_<?= $tId ?>"
+                                     data-status="<?= htmlspecialchars($rawStatus) ?>"
+                                     onclick="handleMapTableClick(<?= $tId ?>, '<?= htmlspecialchars($rawStatus) ?>')">
 
-<!-- Tiền cọc -->
-<td>
-    <?= number_format((float)($reservation['deposit_amount'] ?? 0), 0, ',', '.') ?> đ
-</td>
-
-<!-- Yêu cầu đặc biệt -->
-<td style="white-space: normal; min-width: 200px; max-width: 280px;">
-    <?php if (!empty($reservation['special_request'])): ?>
-        <?= nl2br(bookingEscape($reservation['special_request'])) ?>
-    <?php else: ?>
-        <span style="color: #8492a5;">Không có ghi chú</span>
-    <?php endif; ?>
-</td>
-
-                                <td>
-                                    <span
-                                        class="booking-status"
-                                        style="background:<?= $color ?>">
-
-                                        <?= bookingEscape(
-                                            $statusLabels[$status] ?? $status
-                                        ) ?>
-
-                                    </span>
-                                </td>
-
-                                <td>
-
-                                    <div class="booking-actions">
-
-                                        <?php if ($status === 'Pending'): ?>
-
-                                            <form method="POST">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="action"
-                                                    value="status">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int)$reservation['id'] ?>">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="status"
-                                                    value="Confirmed">
-
-                                                <button
-                                                    class="booking-confirm"
-                                                    type="submit">
-                                                    Xác nhận
-                                                </button>
-
-                                            </form>
-
-                                        <?php endif; ?>
-
-                                        <?php if ($status === 'Confirmed'): ?>
-
-                                            <form method="POST">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="action"
-                                                    value="status">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int)$reservation['id'] ?>">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="status"
-                                                    value="CheckedIn">
-
-                                                <button
-                                                    class="booking-checkin"
-                                                    type="submit">
-                                                    Check-in
-                                                </button>
-
-                                            </form>
-
-                                        <?php endif; ?>
-
-                                        <?php if (in_array(
-                                            $status,
-                                            ['Pending', 'Confirmed'],
-                                            true
-                                        )): ?>
-
-                                            <form
-                                                method="POST"
-                                                onsubmit="return confirm('Bạn có chắc muốn hủy đặt bàn này?')">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="action"
-                                                    value="status">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int)$reservation['id'] ?>">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="status"
-                                                    value="Cancelled">
-
-                                                <button
-                                                    class="booking-cancel"
-                                                    type="submit">
-                                                    Hủy
-                                                </button>
-
-                                            </form>
-
-                                        <?php endif; ?>
-
+                                    <div class="vp-chairs">
+                                        <?php for ($c = 0; $c < $topChairs; $c++): ?>
+                                            <span class="vp-chair"></span>
+                                        <?php endfor; ?>
                                     </div>
 
-                                </td>
+                                    <div class="vp-table-surface">
+                                        <div style="font-size: 14.5px; font-weight: 800; color: var(--vp-navy);">
+                                            <?= htmlspecialchars($tb['table_name']) ?>
+                                        </div>
+                                        <div style="font-size: 11px; font-weight: 700; color: var(--vp-muted);">
+                                            <?= $cap ?> ghế · <?= htmlspecialchars($tb['table_type'] ?? 'Standard') ?>
+                                        </div>
+                                        <div style="width:100%; margin-top:5px; padding-top:5px; border-top:1px dashed rgba(15,23,42,0.12); font-size:11px; font-weight:800;">
+                                            <?= htmlspecialchars($kdsTextLine) ?>
+                                        </div>
+                                    </div>
 
-                            </tr>
+                                    <div class="vp-chairs">
+                                        <?php for ($c = 0; $c < $botChairs; $c++): ?>
+                                            <span class="vp-chair"></span>
+                                        <?php endfor; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
 
-                        <?php endforeach; ?>
+            <!-- Thanh ngang 2: Bộ lọc trạng thái bàn -->
+            <div class="vp-hbar">
+                <div class="vp-hgroup" id="hStatusFilter">
+                    <button type="button" class="vp-pill active" data-st="ALL">
+                        Tất cả bàn · <?= (int)($statistics['total'] ?? 0) ?>
+                    </button>
+                    <button type="button" class="vp-pill" data-st="Available">
+                        Bàn trống · <?= (int)($statistics['available'] ?? 0) ?>
+                    </button>
+                    <button type="button" class="vp-pill" data-st="Occupied">
+                        Đang phục vụ · <?= (int)($statistics['occupied'] ?? 0) ?>
+                    </button>
+                    <button type="button" class="vp-pill" data-st="Reserved">
+                        Đã đặt trước · <?= (int)($statistics['reserved'] ?? 0) ?>
+                    </button>
+                    <button type="button" class="vp-pill" data-st="Cleaning">
+                        Đang dọn · <?= (int)($statistics['cleaning'] ?? 0) ?>
+                    </button>
+                </div>
+            </div>
 
-                    <?php endif; ?>
-
-                </tbody>
-
-            </table>
-
-        </div>
-    </section>
-
-    <a href="index.php?c=booking&a=index">
-        ← Quay lại sơ đồ bàn
-    </a>
-
+        </section>
+    </div>
 </div>
+
+<!-- POPUP TẠO PHIẾU ĐẶT BÀN MỚI -->
+<div class="vp-modal-backdrop" id="modalCreateBooking">
+    <div class="vp-modal-dialog">
+        <div class="vp-modal-header">
+            <span>Tạo phiếu đặt bàn mới</span>
+            <button type="button" class="vp-mini-btn" onclick="closeBookingModal()">Đóng</button>
+        </div>
+        <div class="vp-modal-body">
+            <form method="POST" action="index.php?c=booking&a=vip">
+                <input type="hidden" name="return_page" value="vip">
+                <input type="hidden" name="action" value="create">
+                <div class="vp-form-grid">
+                    <div>
+                        <label class="vp-label">Họ và tên khách hàng *</label>
+                        <input type="text" name="full_name" class="vp-input" placeholder="Nhập họ tên khách" required>
+                    </div>
+                    <div>
+                        <label class="vp-label">Số điện thoại liên hệ *</label>
+                        <input type="tel" name="phone" class="vp-input" pattern="0[0-9]{9,10}" maxlength="11" placeholder="0988888888" required>
+                    </div>
+                    <div>
+                        <label class="vp-label">Địa chỉ Email</label>
+                        <input type="email" name="email" class="vp-input" placeholder="khachhang@email.com">
+                    </div>
+                    <div>
+                        <label class="vp-label">Chọn bàn phục vụ *</label>
+                        <select name="table_id" id="modalTableSelect" class="vp-input" required>
+                            <option value="">-- Chọn bàn phù hợp --</option>
+                            <?php foreach ($tables as $t): ?>
+                                <?php $tType = $t['table_type'] ?? 'Standard'; ?>
+                                <option value="<?= (int)$t['id'] ?>" data-type="<?= htmlspecialchars($tType) ?>">
+                                    <?= htmlspecialchars($t['table_name'] . ' · ' . $cleanText($t['area_name'] ?? '') . ' · ' . $t['capacity'] . ' ghế') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="vp-label">Thời gian khách đến *</label>
+                        <input type="datetime-local" name="booking_time" class="vp-input" value="<?= htmlspecialchars($defaultBookingTime) ?>" required>
+                    </div>
+                    <div>
+                        <label class="vp-label">Số lượng khách *</label>
+                        <input type="number" name="guest_count" id="modalGuestCount" class="vp-input" min="1" max="100" value="4" required>
+                    </div>
+                    <div>
+                        <label class="vp-label">Tiền đặt cọc trước</label>
+                        <input type="number" name="deposit_amount" id="modalDepositAmount" class="vp-input" min="0" step="10000" value="50000" required>
+                    </div>
+                    <div>
+                        <label class="vp-label">Ghi chú phục vụ</label>
+                        <input type="text" name="special_request" class="vp-input" placeholder="Trang trí sinh nhật, ghế trẻ em...">
+                    </div>
+                </div>
+                <div style="margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px;">
+                    <button type="button" class="vp-btn" onclick="closeBookingModal()">Hủy</button>
+                    <button type="submit" class="vp-btn gold">Lưu phiếu đặt bàn</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentVTab = 'ALL';
+let currentFloorFilter = 'ALL';
+let currentAreaFilter = 'ALL';
+let currentTableStFilter = 'ALL';
+
+function filterVerticalList() {
+    const kw = (document.getElementById('vSearchInput').value || '').trim().toLowerCase();
+    document.querySelectorAll('#vReservationList .vp-res-card').forEach(function (item) {
+        const itemTab = item.getAttribute('data-tab') || '';
+        const itemSearch = item.getAttribute('data-search') || '';
+        const matchTab = (currentVTab === 'ALL') || (itemTab === currentVTab);
+        const matchKw = (kw === '') || (itemSearch.indexOf(kw) !== -1);
+        item.style.display = (matchTab && matchKw) ? '' : 'none';
+    });
+}
+
+document.querySelectorAll('#vStatusTabs .vp-v-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#vStatusTabs .vp-v-tab').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentVTab = this.getAttribute('data-tab') || 'ALL';
+        filterVerticalList();
+    });
+});
+
+document.getElementById('vSearchInput').addEventListener('input', filterVerticalList);
+
+function syncRoomVisibility() {
+    document.querySelectorAll('.area-room-section').forEach(function (sec) {
+        const aId = sec.getAttribute('data-area-id');
+        const flNum = sec.getAttribute('data-floor-num');
+        const matchFloor = (currentFloorFilter === 'ALL' || flNum === currentFloorFilter);
+        const matchArea = (currentAreaFilter === 'ALL' || aId === currentAreaFilter);
+        sec.style.display = (matchFloor && matchArea) ? '' : 'none';
+    });
+}
+
+document.querySelectorAll('#hFloorTabs .vp-pill').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#hFloorTabs .vp-pill').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentFloorFilter = this.getAttribute('data-floor') || 'ALL';
+        syncRoomVisibility();
+    });
+});
+
+document.querySelectorAll('#hAreaTabs .vp-pill').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#hAreaTabs .vp-pill').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentAreaFilter = this.getAttribute('data-area') || 'ALL';
+        syncRoomVisibility();
+    });
+});
+
+document.querySelectorAll('#hStatusFilter .vp-pill').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#hStatusFilter .vp-pill').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentTableStFilter = this.getAttribute('data-st') || 'ALL';
+        document.querySelectorAll('.map-table-node').forEach(function (node) {
+            const st = node.getAttribute('data-status');
+            node.style.display = (currentTableStFilter === 'ALL' || st === currentTableStFilter) ? '' : 'none';
+        });
+    });
+});
+
+function focusTableOnMap(tableId, itemEl) {
+    document.querySelectorAll('.vp-res-card').forEach(el => el.classList.remove('active'));
+    if (itemEl) itemEl.classList.add('active');
+
+    document.querySelectorAll('.map-table-node').forEach(el => el.classList.remove('highlight-focus'));
+    if (tableId > 0) {
+        const target = document.getElementById('map_table_' + tableId);
+        if (target) {
+            target.classList.add('highlight-focus');
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+function handleMapTableClick(tableId, status) {
+    if (status === 'Occupied') {
+        window.location.href = 'index.php?c=pos&a=index';
+        return;
+    }
+    openBookingModal(tableId);
+}
+
+function openBookingModal(tableId) {
+    const modal = document.getElementById('modalCreateBooking');
+    const select = document.getElementById('modalTableSelect');
+    if (select && tableId > 0) {
+        select.value = String(tableId);
+        updateSuggestedDeposit();
+    }
+    modal.classList.add('show');
+}
+
+function closeBookingModal() {
+    document.getElementById('modalCreateBooking').classList.remove('show');
+}
+
+function updateSuggestedDeposit() {
+    const select = document.getElementById('modalTableSelect');
+    const count = parseInt(document.getElementById('modalGuestCount').value || '1', 10);
+    const opt = select.options[select.selectedIndex];
+    const tType = opt ? (opt.getAttribute('data-type') || 'Standard') : 'Standard';
+
+    let dep = 50000;
+    if (tType === 'Premium') dep = 10000000;
+    else if (tType === 'VIP') dep = 5000000;
+    else if (count > 20) dep = 300000;
+    else if (count > 12) dep = 200000;
+    else if (count > 8) dep = 150000;
+    else if (count > 4) dep = 100000;
+
+    document.getElementById('modalDepositAmount').value = dep;
+}
+
+document.getElementById('modalTableSelect').addEventListener('change', updateSuggestedDeposit);
+document.getElementById('modalGuestCount').addEventListener('change', updateSuggestedDeposit);
+</script>

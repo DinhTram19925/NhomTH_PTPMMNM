@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../config/Database.php';
 
 class PromotionModel
@@ -30,9 +30,7 @@ class PromotionModel
 
     public function findPromotion(int $id): ?array
     {
-        $stmt = $this->db->prepare(
-            "SELECT * FROM promotions WHERE id = ?"
-        );
+        $stmt = $this->db->prepare("SELECT * FROM promotions WHERE id = ?");
         $stmt->execute([$id]);
 
         $promotion = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -138,21 +136,17 @@ class PromotionModel
 
     public function deletePromotion(int $id): bool
     {
-        $stmt = $this->db->prepare(
-            "DELETE FROM promotions WHERE id = ?"
-        );
-
+        $stmt = $this->db->prepare("DELETE FROM promotions WHERE id = ?");
         return $stmt->execute([$id]);
     }
 
     public function togglePromotion(int $id): bool
     {
-        $stmt = $this->db->prepare(
-            "UPDATE promotions
-             SET is_active = IF(is_active = 1, 0, 1)
-             WHERE id = ?"
-        );
-
+        $stmt = $this->db->prepare("
+            UPDATE promotions
+            SET is_active = IF(is_active = 1, 0, 1)
+            WHERE id = ?
+        ");
         return $stmt->execute([$id]);
     }
 
@@ -161,14 +155,13 @@ class PromotionModel
         float $orderValue,
         string $customerTier = 'Standard'
     ): array {
-        $stmt = $this->db->prepare(
-            "SELECT * FROM promotions
-             WHERE code = ?
-             AND is_active = 1
-             AND start_date <= CURDATE()
-             AND end_date >= CURDATE()
-             LIMIT 1"
-        );
+        $stmt = $this->db->prepare("
+            SELECT * FROM promotions
+            WHERE code = ?
+              AND is_active = 1
+              AND NOW() BETWEEN start_date AND end_date
+            LIMIT 1
+        ");
 
         $stmt->execute([strtoupper(trim($code))]);
         $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -189,19 +182,17 @@ class PromotionModel
 
         if ($voucher['discount_type'] === 'Percent') {
             $discount = $orderValue * (float)$voucher['discount_value'] / 100;
-
             if ($voucher['max_discount'] !== null) {
                 $discount = min($discount, (float)$voucher['max_discount']);
             }
         } else {
             $discount = (float)$voucher['discount_value'];
-
             if ($voucher['max_discount'] !== null) {
                 $discount = min($discount, (float)$voucher['max_discount']);
             }
         }
 
-        $discount = min($discount, $orderValue);
+        $discount = round(max(0, min($discount, $orderValue)));
 
         return [
             'valid' => true,

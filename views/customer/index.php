@@ -1,624 +1,531 @@
-
 <?php
-function h($value) {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+$flashErr = $_SESSION['crm_flash_error'] ?? '';
+unset($_SESSION['crm_flash_error']);
+if ($flashErr !== '' && empty($error)) {
+    $error = $flashErr;
 }
 
-$stats = $statistics ?? [];
+$totalCustomers = (int)($statistics['total_customers'] ?? 0);
+$standardCount  = (int)($statistics['standard_count'] ?? 0);
+$silverCount    = (int)($statistics['silver_count'] ?? 0);
+$goldCount      = (int)($statistics['gold_count'] ?? 0);
+$diamondCount   = (int)($statistics['diamond_count'] ?? 0);
+$totalRevenue   = (float)($statistics['total_revenue'] ?? 0);
 ?>
 
 <style>
-/* ROYALDINE 5S - VIP & LOYALTY */
-
-.rd-customer {
-    --gold: #d8b66c;
-    --gold-light: #f3dfaa;
-    --bg: #111925;
-    --panel: #1a2737;
-    --panel2: #202e40;
-    --border: #354458;
-    --text: #f4f5f7;
-    --muted: #a4b0c1;
-
-    box-sizing: border-box;
-    min-height: 700px;
-    padding: 28px;
-    color: var(--text);
-    background:
-        radial-gradient(ellipse at 90% 0%, #29374a 0%, transparent 38%),
-        var(--bg);
-    border-radius: 14px;
-    font-family: "Segoe UI", Arial, sans-serif;
+.crm-page-wrap {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    color: #1e293b;
 }
 
-.rd-customer *,
-.rd-customer *::before,
-.rd-customer *::after {
-    box-sizing: border-box;
-}
-
-/* HEADER */
-
-.rd-customer .customer-header {
+.crm-header-bar {
+    background: #ffffff;
+    border: 1px solid #dce3ec;
+    border-left: 5px solid #17243b;
+    border-radius: 12px;
+    padding: 18px 22px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 15px;
-    margin-bottom: 25px;
-}
-
-.rd-customer h2 {
-    margin: 0 0 7px;
-    color: var(--gold-light);
-    font: 500 clamp(25px, 3vw, 34px) Georgia, "Times New Roman", serif;
-}
-
-.rd-customer .customer-subtitle {
-    margin: 0;
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.rd-customer .btn-add-customer {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 42px;
-    padding: 11px 18px;
-    border: 1px solid #e7cd8c;
-    border-radius: 8px;
-    color: #171b21;
-    background: linear-gradient(135deg, #f1dba3, #c8a458);
-    font-size: 13px;
-    font-weight: 700;
-    text-decoration: none;
-    white-space: nowrap;
-    transition: .2s;
-}
-
-.rd-customer .btn-add-customer:hover {
-    color: #171b21;
-    filter: brightness(1.1);
-    transform: translateY(-1px);
-}
-
-/* CARD */
-
-.rd-customer .customer-card {
-    min-width: 0;
-    height: 100%;
-    padding: 19px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: linear-gradient(145deg, #202e40, #192434);
-    box-shadow: 0 8px 24px #00000018;
-}
-
-.rd-customer .stat-label {
-    margin-bottom: 7px;
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.rd-customer .stat-number {
-    margin: 0;
-    color: var(--gold-light);
-    font-size: 27px;
-    font-weight: 700;
-}
-
-.rd-customer .stat-total {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 14px;
+    gap: 12px;
     margin-bottom: 18px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
-
-.rd-customer .stat-summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 15px;
-    margin-bottom: 22px;
-}
-
-.rd-customer .stat-summary .customer-card {
-    padding: 22px;
-}
-
-.rd-customer .points-value {
+.crm-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #17243b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
     margin: 0;
-    color: #78aaff;
-    font-size: 25px;
-    font-weight: 700;
 }
-
-.rd-customer .revenue-value {
-    margin: 0;
-    color: #6bd5a0;
-    font-size: 25px;
-    font-weight: 700;
-}
-
-/* TIER COLORS */
-
-.rd-customer .tier-badge {
-    display: inline-block;
-    padding: 6px 11px;
-    border: 1px solid transparent;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.rd-customer .tier-Standard {
-    color: #d5dce5;
-    background: #465365;
-    border-color: #64748b;
-}
-
-.rd-customer .tier-Silver {
-    color: #e5e9ef;
-    background: #536174;
-    border-color: #8996a8;
-}
-
-.rd-customer .tier-Gold {
-    color: #f5dfa1;
-    background: #66532b;
-    border-color: #b58c3d;
-}
-
-.rd-customer .tier-Diamond {
-    color: #a9e9ff;
-    background: #174b63;
-    border-color: #3686a5;
-}
-
-/* ALERT */
-
-.rd-customer .customer-alert {
-    margin-bottom: 16px;
-    padding: 13px 15px;
+.btn-crm-gold {
+    background: #c69b45;
+    border: 1px solid #c69b45;
+    color: #17243b;
+    font-weight: 800;
+    font-size: 13.5px;
+    padding: 9px 18px;
     border-radius: 8px;
-    font-size: 13px;
-}
-
-.rd-customer .customer-alert.success {
-    border: 1px solid #287b61;
-    color: #9ce8c7;
-    background: #164333;
-}
-
-/* MAIN LIST */
-
-.rd-customer .customer-list {
-    padding: 20px;
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    background: linear-gradient(145deg, #202e40, #192434);
-    box-shadow: 0 10px 28px #00000018;
-}
-
-/* SEARCH */
-
-.rd-customer .customer-search {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 170px;
-    gap: 10px;
-    margin-bottom: 18px;
-}
-
-.rd-customer .customer-search input {
-    width: 100%;
-    min-width: 0;
-    min-height: 42px;
-    padding: 10px 13px;
-    border: 1px solid #46566c;
-    border-radius: 8px;
-    outline: none;
-    color: var(--text);
-    background: #121d2b;
-    font: 13px "Segoe UI", Arial, sans-serif;
-    transition: .2s;
-}
-
-.rd-customer .customer-search input::placeholder {
-    color: #8492a5;
-}
-
-.rd-customer .customer-search input:focus {
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px #d8b66c18;
-}
-
-.rd-customer .btn-search {
-    min-height: 42px;
-    padding: 10px 15px;
-    border: 1px solid #e7cd8c;
-    border-radius: 8px;
-    color: #171b21;
-    background: linear-gradient(135deg, #f1dba3, #c8a458);
-    font-size: 13px;
-    font-weight: 700;
     cursor: pointer;
-    transition: .2s;
+    transition: 0.18s;
+}
+.btn-crm-gold:hover {
+    background: #b28735;
+    border-color: #b28735;
+    color: #ffffff;
 }
 
-.rd-customer .btn-search:hover {
-    filter: brightness(1.1);
+.crm-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
 }
-
-/* TABLE */
-
-.rd-customer .customer-table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 9px;
+@media (max-width: 1100px) {
+    .crm-kpi-grid { grid-template-columns: repeat(3, 1fr); }
 }
-
-.rd-customer .customer-table {
-    width: 100%;
-    min-width: 850px;
-    margin: 0;
-    border-collapse: collapse;
-    background: #182434;
+@media (max-width: 576px) {
+    .crm-kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
-
-.rd-customer .customer-table th,
-.rd-customer .customer-table td {
-    padding: 13px 12px;
-    border-bottom: 1px solid var(--border);
-    color: #dce3ec;
-    text-align: left;
-    vertical-align: middle;
-    font-size: 12px;
+.crm-kpi-box {
+    background: #ffffff;
+    border: 1px solid #dce3ec;
+    border-top: 3px solid #17243b;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
 }
-
-.rd-customer .customer-table th {
-    color: var(--gold-light);
-    background: var(--panel2);
+.crm-kpi-label {
     font-size: 11px;
     font-weight: 700;
-    white-space: nowrap;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+.crm-kpi-num {
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #17243b;
 }
 
-.rd-customer .customer-table tbody tr {
-    transition: background .2s;
+.crm-main-card {
+    background: #ffffff;
+    border: 1px solid #dce3ec;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
 }
-
-.rd-customer .customer-table tbody tr:hover {
-    background: #ffffff08;
-}
-
-.rd-customer .customer-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.rd-customer .customer-name {
-    display: block;
-    margin-bottom: 4px;
-    color: #f3dfaa;
+.crm-navy-strip {
+    background: #17243b;
+    color: #e5bd69;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 13px 20px;
+    border-bottom: 2px solid #c69b45;
 }
-
-.rd-customer .customer-email {
-    color: var(--muted);
-    font-size: 11px;
+.crm-card-body {
+    padding: 18px 20px;
 }
-
-.rd-customer .customer-points {
-    color: #78aaff !important;
-    font-weight: 700;
-}
-
-.rd-customer .customer-revenue {
-    color: #6bd5a0 !important;
-    font-weight: 700;
-}
-
-/* ACTION BUTTONS */
-
-.rd-customer .customer-actions {
+.crm-search-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.crm-search-input {
+    flex: 1;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 13.5px;
+}
+.crm-search-input:focus {
+    outline: none;
+    border-color: #c69b45;
+    box-shadow: 0 0 0 3px rgba(198, 155, 69, 0.15);
+}
+.btn-crm-search {
+    background: #17243b;
+    color: #e5bd69;
+    border: 1px solid #17243b;
+    border-radius: 8px;
+    padding: 9px 26px;
+    font-weight: 700;
+    font-size: 13.5px;
+    min-width: 140px;
+    transition: 0.18s;
+}
+.btn-crm-search:hover {
+    background: #0f172a;
+    color: #ffffff;
 }
 
-.rd-customer .customer-actions a {
-    display: inline-flex;
+.crm-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.crm-table th {
+    background: #f8fafc;
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #17243b;
+    padding: 12px 10px;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+.crm-table td {
+    padding: 13px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13.5px;
+    vertical-align: middle;
+}
+.crm-table tr:hover td {
+    background: #fffdf9;
+}
+.crm-tier-pill {
+    display: inline-block;
+    padding: 3px 11px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.tier-Standard { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+.tier-Silver   { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.tier-Gold     { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.tier-Diamond  { background: #17243b; color: #e5bd69; border: 1px solid #c69b45; }
+
+.btn-crm-action {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #17243b;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-block;
+    transition: 0.15s;
+    cursor: pointer;
+}
+.btn-crm-action:hover {
+    border-color: #17243b;
+    background: #17243b;
+    color: #ffffff;
+}
+.btn-crm-edit {
+    background: #fffbeb;
+    border-color: #c69b45;
+    color: #92400e;
+}
+.btn-crm-edit:hover {
+    background: #c69b45;
+    border-color: #c69b45;
+    color: #17243b;
+}
+
+/* POPUP MODAL 2 CỘT CHUẨN CUKCUK */
+.crm-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 1055;
     align-items: center;
     justify-content: center;
-    min-height: 31px;
-    padding: 7px 11px;
-    border: 1px solid;
-    border-radius: 6px;
-    font-size: 11px;
+    padding: 16px;
+}
+.crm-modal-backdrop.on {
+    display: flex;
+}
+.crm-modal-dialog {
+    background: #ffffff;
+    border: 1px solid #dce3ec;
+    border-radius: 14px;
+    width: min(820px, 100%);
+    overflow: hidden;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.22);
+}
+.crm-modal-header {
+    background: #17243b;
+    color: #e5bd69;
+    padding: 14px 24px;
+    font-weight: 800;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #c69b45;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.crm-modal-body {
+    padding: 24px 28px;
+}
+.crm-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+@media (max-width: 640px) {
+    .crm-form-grid { grid-template-columns: 1fr; }
+}
+.crm-field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #17243b;
+    margin-bottom: 6px;
+}
+.crm-field-input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 13px;
+    font-size: 13.5px;
+    color: #0f172a;
+}
+.crm-field-input:focus {
+    outline: none;
+    border-color: #c69b45;
+    box-shadow: 0 0 0 3px rgba(198, 155, 69, 0.16);
+}
+.crm-modal-footer {
+    border-top: 1px solid #e2e8f0;
+    margin-top: 22px;
+    padding-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.btn-crm-cancel {
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+    color: #334155;
     font-weight: 600;
-    text-decoration: none;
-    transition: .2s;
+    font-size: 13px;
+    padding: 8px 18px;
+    border-radius: 7px;
+    cursor: pointer;
 }
-
-.rd-customer .btn-detail {
-    border-color: #4779bd !important;
-    color: #a9ceff !important;
-    background: #203b5e;
-}
-
-.rd-customer .btn-edit {
-    border-color: #a88742 !important;
-    color: #f3dfaa !important;
-    background: #4c4028;
-}
-
-.rd-customer .customer-actions a:hover {
-    filter: brightness(1.2);
-    transform: translateY(-1px);
-}
-
-/* EMPTY */
-
-.rd-customer .empty-data {
-    padding: 35px 15px !important;
-    color: var(--muted) !important;
-    text-align: center !important;
-}
-
-/* RESPONSIVE */
-
-@media (max-width: 1050px) {
-    .rd-customer .stat-total {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 700px) {
-    .rd-customer {
-        padding: 16px;
-    }
-
-    .rd-customer .customer-header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .rd-customer .stat-total {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .rd-customer .stat-summary {
-        grid-template-columns: 1fr;
-    }
-
-    .rd-customer .customer-search {
-        grid-template-columns: 1fr;
-    }
-
-    .rd-customer .customer-list {
-        padding: 13px;
-    }
+.btn-crm-cancel:hover {
+    background: #f1f5f9;
 }
 </style>
 
-<div class="rd-customer">
-
-    <!-- HEADER -->
-    <div class="customer-header">
-        <div>
-            <h2>👑 Hội viên VIP & Loyalty</h2>
-            <p class="customer-subtitle">
-                Quản lý khách hàng và chương trình thành viên RoyalDine 5S.
-            </p>
-        </div>
-
-        <a href="index.php?c=customer&a=create"
-           class="btn-add-customer">
-            ＋ Thêm hội viên
-        </a>
+<div class="crm-page-wrap">
+    <div class="crm-header-bar">
+        <h2 class="crm-title">Quản lý Khách hàng thành viên</h2>
+        <button type="button" class="btn-crm-gold" onclick="openCrmCustomerModal()">
+            Thêm khách hàng mới
+        </button>
     </div>
 
-    <!-- THÔNG BÁO -->
+    <?php if (!empty($error)): ?>
+        <div class="alert alert-danger py-2 fw-semibold"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
     <?php if (!empty($success)): ?>
-        <div class="customer-alert success">
-            ✓ <?= h($success) ?>
-        </div>
+        <div class="alert alert-success py-2 fw-semibold"><?= htmlspecialchars($success) ?></div>
     <?php endif; ?>
 
-    <!-- THỐNG KÊ HẠNG HỘI VIÊN -->
-    <div class="stat-total">
-
-        <div class="customer-card">
-            <div class="stat-label">Tổng hội viên</div>
-            <h3 class="stat-number">
-                <?= number_format((int)($stats['total_customers'] ?? 0)) ?>
-            </h3>
+    <div class="crm-kpi-grid">
+        <div class="crm-kpi-box">
+            <div class="crm-kpi-label">Tổng khách hàng</div>
+            <div class="crm-kpi-num"><?= $totalCustomers ?></div>
         </div>
+        <div class="crm-kpi-box">
+            <div class="crm-kpi-label">Hạng Standard</div>
+            <div class="crm-kpi-num text-secondary"><?= $standardCount ?></div>
+        </div>
+        <div class="crm-kpi-box">
+            <div class="crm-kpi-label">Hạng Silver · Giảm 3%</div>
+            <div class="crm-kpi-num text-info"><?= $silverCount ?></div>
+        </div>
+        <div class="crm-kpi-box">
+            <div class="crm-kpi-label">Hạng Gold · Giảm 5%</div>
+            <div class="crm-kpi-num text-warning"><?= $goldCount ?></div>
+        </div>
+        <div class="crm-kpi-box">
+            <div class="crm-kpi-label">Hạng Diamond · Giảm 10%</div>
+            <div class="crm-kpi-num" style="color:#b45309;"><?= $diamondCount ?></div>
+        </div>
+        <div class="crm-kpi-box">
+            <div class="crm-kpi-label">Tổng chi tiêu</div>
+            <div class="crm-kpi-num"><?= number_format($totalRevenue, 0, ',', '.') ?> ₫</div>
+        </div>
+    </div>
 
-        <?php
-        $tiers = [
-            'standard_count' => 'Standard',
-            'silver_count' => 'Silver',
-            'gold_count' => 'Gold',
-            'diamond_count' => 'Diamond'
-        ];
-        ?>
+    <div class="crm-main-card">
+        <div class="crm-navy-strip">Danh sách hội viên và tích điểm lũy kế</div>
+        <div class="crm-card-body">
+            <form method="GET" action="index.php" class="crm-search-row">
+                <input type="hidden" name="c" value="customer">
+                <input type="hidden" name="a" value="index">
+                <input type="text" name="keyword" class="crm-search-input"
+                       placeholder="Tìm theo họ tên, số điện thoại hoặc email..."
+                       value="<?= htmlspecialchars($keyword ?? '') ?>">
+                <button type="submit" class="btn-crm-search">Tìm kiếm</button>
+            </form>
 
-        <?php foreach ($tiers as $key => $tier): ?>
+            <div class="table-responsive">
+                <table class="crm-table">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">STT</th>
+                            <th>Khách hàng</th>
+                            <th>Số điện thoại</th>
+                            <th class="text-center">Hạng thẻ</th>
+                            <th class="text-end">Điểm tích lũy</th>
+                            <th class="text-end">Tổng chi tiêu</th>
+                            <th class="text-end" style="width:150px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($customers)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">Không tìm thấy khách hàng nào.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($customers as $idx => $c): ?>
+                                <?php
+                                $tier = $c['tier'] ?? 'Standard';
+                                $email = trim((string)($c['email'] ?? ''));
+                                ?>
+                                <tr>
+                                    <td class="text-muted fw-semibold"><?= $idx + 1 ?></td>
+                                    <td>
+                                        <div class="fw-bold text-dark"><?= htmlspecialchars($c['full_name']) ?></div>
+                                        <?php if ($email !== ''): ?>
+                                            <div class="small text-muted"><?= htmlspecialchars($email) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="fw-bold"><?= htmlspecialchars($c['phone']) ?></td>
+                                    <td class="text-center">
+                                        <span class="crm-tier-pill tier-<?= htmlspecialchars($tier) ?>">
+                                            <?= htmlspecialchars($tier) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-bold" style="color:#17243b;">
+                                        <?= number_format((int)$c['points'], 0, ',', '.') ?> điểm
+                                    </td>
+                                    <td class="text-end fw-bold" style="color:#b45309;">
+                                        <?= number_format((float)$c['total_spent'], 0, ',', '.') ?> ₫
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="index.php?c=customer&a=detail&id=<?= (int)$c['id'] ?>" class="btn-crm-action">Hồ sơ</a>
+                                        <button type="button" class="btn-crm-action btn-crm-edit"
+                                                onclick='openCrmCustomerModal(<?= htmlspecialchars(json_encode([
+                                                    "id"        => (int)$c["id"],
+                                                    "full_name" => $c["full_name"],
+                                                    "phone"     => $c["phone"],
+                                                    "email"     => $email
+                                                ], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)'>
+                                            Sửa
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
-            <div class="customer-card">
-                <div class="stat-label">
-                    <?= h($tier) ?>
+<!-- POPUP THÊM / SỬA KHÁCH HÀNG 2 CỘT ĐỒNG BỘ POS & CRM -->
+<div class="crm-modal-backdrop" id="crmCustomerModal">
+    <div class="crm-modal-dialog">
+        <div class="crm-modal-header">
+            <span id="crmModalHeaderTitle">Tạo hồ sơ khách hàng thành viên</span>
+        </div>
+        <div class="crm-modal-body">
+            <form method="POST" action="index.php?c=customer&a=index">
+                <input type="hidden" name="customer_id" id="crmModalCustomerId" value="">
+
+                <div class="crm-form-grid">
+                    <div>
+                        <label class="crm-field-label">Họ và tên khách hàng *</label>
+                        <input type="text" name="full_name" id="crmModalFullName" class="crm-field-input"
+                               placeholder="Nhập đầy đủ họ và tên khách hàng" maxlength="100" required>
+                    </div>
+                    <div>
+                        <label class="crm-field-label">Số điện thoại di động *</label>
+                        <input type="tel" name="phone" id="crmModalPhone" class="crm-field-input"
+                               placeholder="Nhập số điện thoại 9-11 chữ số" pattern="[0-9]{9,11}" maxlength="11" required>
+                    </div>
                 </div>
 
-                <h3 class="stat-number">
-                    <?= number_format((int)($stats[$key] ?? 0)) ?>
-                </h3>
-            </div>
+                <div style="margin-top: 16px;">
+                    <label class="crm-field-label">Địa chỉ Email</label>
+                    <input type="email" name="email" id="crmModalEmail" class="crm-field-input"
+                           placeholder="vidu@email.com" maxlength="100">
+                </div>
 
-        <?php endforeach; ?>
-
+                <div class="crm-modal-footer">
+                    <button type="button" class="btn-crm-cancel" onclick="closeCrmCustomerModal()">Hủy bỏ</button>
+                    <button type="submit" class="btn-crm-gold" id="crmModalSubmitBtn">Tạo hồ sơ khách hàng</button>
+                </div>
+            </form>
+        </div>
     </div>
-
-    <!-- THỐNG KÊ ĐIỂM VÀ CHI TIÊU -->
-    <div class="stat-summary">
-
-        <div class="customer-card">
-            <div class="stat-label">Tổng điểm thưởng</div>
-
-            <h3 class="points-value">
-                <?= number_format((int)($stats['total_points'] ?? 0)) ?>
-                điểm
-            </h3>
-        </div>
-
-        <div class="customer-card">
-            <div class="stat-label">Tổng chi tiêu hội viên</div>
-
-            <h3 class="revenue-value">
-                <?= number_format((float)($stats['total_revenue'] ?? 0)) ?>
-                đ
-            </h3>
-        </div>
-
-    </div>
-
-    <!-- DANH SÁCH HỘI VIÊN -->
-    <section class="customer-list">
-
-        <!-- TÌM KIẾM -->
-        <form method="GET" class="customer-search">
-
-            <input type="hidden" name="c" value="customer">
-            <input type="hidden" name="a" value="index">
-
-            <input
-                type="text"
-                name="keyword"
-                placeholder="Tìm theo tên, số điện thoại hoặc email..."
-                value="<?= h($keyword ?? '') ?>"
-            >
-
-            <button type="submit" class="btn-search">
-                Tìm kiếm
-            </button>
-
-        </form>
-
-        <!-- BẢNG KHÁCH HÀNG -->
-        <div class="customer-table-wrap">
-
-            <table class="customer-table">
-
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Khách hàng</th>
-                        <th>Số điện thoại</th>
-                        <th>Hạng thành viên</th>
-                        <th>Điểm thưởng</th>
-                        <th>Tổng chi tiêu</th>
-                        <th>Thao tác</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    <?php if (empty($customers)): ?>
-
-                        <tr>
-                            <td colspan="7" class="empty-data">
-                                Chưa có dữ liệu hội viên.
-                            </td>
-                        </tr>
-
-                    <?php else: ?>
-
-                        <?php foreach ($customers as $index => $customer): ?>
-
-                            <?php
-                            $tier = $customer['tier'] ?? 'Standard';
-
-                            $allowedTiers = [
-                                'Standard',
-                                'Silver',
-                                'Gold',
-                                'Diamond'
-                            ];
-
-                            if (!in_array($tier, $allowedTiers, true)) {
-                                $tier = 'Standard';
-                            }
-                            ?>
-
-                            <tr>
-
-                                <td>
-                                    <?= $index + 1 ?>
-                                </td>
-
-                                <td>
-                                    <span class="customer-name">
-                                        <?= h($customer['full_name']) ?>
-                                    </span>
-
-                                    <span class="customer-email">
-                                        <?= h($customer['email']) ?>
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <?= h($customer['phone']) ?>
-                                </td>
-
-                                <td>
-                                    <span class="tier-badge tier-<?= h($tier) ?>">
-                                        <?= h($tier) ?>
-                                    </span>
-                                </td>
-
-                                <td class="customer-points">
-                                    <?= number_format((int)$customer['points']) ?>
-                                </td>
-
-                                <td class="customer-revenue">
-                                    <?= number_format((float)$customer['total_spent']) ?>
-                                    đ
-                                </td>
-
-                                <td>
-                                    <div class="customer-actions">
-
-                                        <a
-                                            class="btn-detail"
-                                            href="index.php?c=customer&a=detail&id=<?= (int)$customer['id'] ?>"
-                                        >
-                                            Chi tiết
-                                        </a>
-
-                                        <a
-                                            class="btn-edit"
-                                            href="index.php?c=customer&a=edit&id=<?= (int)$customer['id'] ?>"
-                                        >
-                                            Sửa
-                                        </a>
-
-                                    </div>
-                                </td>
-
-                            </tr>
-
-                        <?php endforeach; ?>
-
-                    <?php endif; ?>
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </section>
-
 </div>
+
+<script>
+function openCrmCustomerModal(data = null) {
+    const modal       = document.getElementById('crmCustomerModal');
+    const headerTitle = document.getElementById('crmModalHeaderTitle');
+    const idInput     = document.getElementById('crmModalCustomerId');
+    const nameInput   = document.getElementById('crmModalFullName');
+    const phoneInput  = document.getElementById('crmModalPhone');
+    const emailInput  = document.getElementById('crmModalEmail');
+    const submitBtn   = document.getElementById('crmModalSubmitBtn');
+
+    if (data && data.id) {
+        headerTitle.textContent = 'Cập nhật hồ sơ khách hàng thành viên';
+        idInput.value           = data.id;
+        nameInput.value         = data.full_name || '';
+        phoneInput.value        = data.phone || '';
+        emailInput.value        = data.email || '';
+        submitBtn.textContent   = 'Lưu cập nhật';
+    } else {
+        headerTitle.textContent = 'Tạo hồ sơ khách hàng thành viên';
+        idInput.value           = '';
+        nameInput.value         = data && data.full_name ? data.full_name : '';
+        phoneInput.value        = data && data.phone ? data.phone : '';
+        emailInput.value        = data && data.email ? data.email : '';
+        submitBtn.textContent   = 'Tạo hồ sơ khách hàng';
+    }
+
+    modal.classList.add('on');
+    setTimeout(() => nameInput.focus(), 50);
+}
+
+function closeCrmCustomerModal() {
+    document.getElementById('crmCustomerModal').classList.remove('on');
+}
+
+document.getElementById('crmCustomerModal').addEventListener('click', function (e) {
+    if (e.target === this) {
+        closeCrmCustomerModal();
+    }
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeCrmCustomerModal();
+    }
+});
+document.addEventListener('DOMContentLoaded', function () {
+    <?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($error)): ?>
+        openCrmCustomerModal(<?= json_encode([
+            'id'        => !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null,
+            'full_name' => trim((string)($_POST['full_name'] ?? '')),
+            'phone'     => trim((string)($_POST['phone'] ?? '')),
+            'email'     => trim((string)($_POST['email'] ?? ''))
+        ], JSON_UNESCAPED_UNICODE) ?>);
+    <?php elseif (!empty($_GET['edit_id'])): ?>
+        <?php
+        $editTarget = null;
+        foreach ($customers as $item) {
+            if ((int)$item['id'] === (int)$_GET['edit_id']) {
+                $editTarget = [
+                    'id'        => (int)$item['id'],
+                    'full_name' => $item['full_name'],
+                    'phone'     => $item['phone'],
+                    'email'     => trim((string)($item['email'] ?? ''))
+                ];
+                break;
+            }
+        }
+        ?>
+        <?php if ($editTarget): ?>
+            openCrmCustomerModal(<?= json_encode($editTarget, JSON_UNESCAPED_UNICODE) ?>);
+        <?php endif; ?>
+    <?php endif; ?>
+});
+</script>
