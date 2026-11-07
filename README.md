@@ -1,4 +1,4 @@
-﻿# RoyalDine 5S - Hệ Thống Quản Lý Nhà Hàng 5 Sao (PHP MVC & MySQL)
+﻿# RoyalDine 5S - Hệ Thống Quản Lý Nhà Hàng 5 Sao
 Học phần: Phát triển phần mềm mã nguồn mở (NhomTH_PTPMMNM)
 
 ## Danh sách thành viên & Phân công
